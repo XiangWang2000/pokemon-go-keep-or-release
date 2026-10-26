@@ -8,13 +8,33 @@ let DATA = null, FORMS = [], filtr = { search: '', tier: '', type: '', extra: ''
 
 // 世代用全國圖鑑號區段判定（圖鑑號在 GO 沿用主系列，不隨形態變動）
 const GEN_RANGES = { 1: [1, 151], 2: [152, 251], 3: [252, 386], 4: [387, 493], 5: [494, 649], 6: [650, 721], 7: [722, 809], 8: [810, 905], 9: [906, 9999] };
-const REGION_TAGS = ['alolan', 'galarian', 'hisuian', 'paldean'];
-// 同圖鑑號內的階段序：一般 → 暗影 → 極巨化 → 超極巨化；地區形態排在關都本體之後
-function formOrderRank(f) {
-  const tags = f.tags || [];
-  const regional = REGION_TAGS.some(t => tags.includes(t)) ? 1 : 0;
-  const stage = f.dmg ? 3 : f.dm ? 2 : tags.includes('shadow') ? 1 : 0;
-  return stage * 2 + regional;
+const REGION_MARKERS = ['_alolan', '_galarian', '_hisuian', '_paldean'];
+// 同圖鑑號內的地區主導排序：一個地區（或一條形態線）的行排完才排下一條——
+// 關都本體線 → 起源等特殊形態（同本體區）→ 阿羅拉 → 伽勒爾 → 洗翠 → 帕底亞；
+// 線內順序：一般 → 暗影 → 極巨化 → 超極巨化
+function lineKey(id) {
+  let core = id, stage = 0;
+  for (;;) {
+    if (core.endsWith('_shadow')) { core = core.slice(0, -7); if (stage < 1) stage = 1; }
+    else if (core.endsWith('_dmax')) { core = core.slice(0, -5); if (stage < 2) stage = 2; }
+    else if (core.endsWith('_gmax')) { core = core.slice(0, -5); if (stage < 3) stage = 3; }
+    else break;
+  }
+  let group = 0;
+  for (let i = 0; i < REGION_MARKERS.length; i++) if (core.includes(REGION_MARKERS[i])) group = i + 1;
+  return { core, group, stage };
+}
+// 讓每行 _sk＝地區×大常數＋線序×10＋階段（載入後算一次）
+function assignSortKeys() {
+  const lineSeq = new Map(), counter = new Map();
+  for (const f of FORMS) {
+    const k = lineKey(f.id);
+    const gk = f.dex + '|' + k.group;
+    const lk = gk + '|' + k.core;
+    let n = lineSeq.get(lk);
+    if (n === undefined) { n = counter.get(gk) || 0; lineSeq.set(lk, n); counter.set(gk, n + 1); }
+    f._sk = k.group * 100000 + n * 10 + k.stage;
+  }
 }
 let current = null, curLeague = '1500';
 let lastFocus = null; // 開詳細面板前的焦點元素，關閉時歸位
@@ -163,11 +183,11 @@ function render() {
   const list = FORMS.filter(passFilter);
   const key = filtr.sort;
   list.sort((x, y) => {
-    if (key === 'dex') return x.dex - y.dex || formOrderRank(x) - formOrderRank(y);
+    if (key === 'dex') return x.dex - y.dex || (x._sk - y._sk);
     if (key === 'cp') return y.cp50 - x.cp50;
     if (key === 'pvp') { const bx = bestRank(x), by = bestRank(y); return (bx ? bx.r : 9999) - (by ? by.r : 9999); }
     if (key === 'pve') return (y.pve?.pct ?? -1) - (x.pve?.pct ?? -1);
-    if (key === 'tier') return x.verdict.tier - y.verdict.tier || x.dex - y.dex || formOrderRank(x) - formOrderRank(y);
+    if (key === 'tier') return x.verdict.tier - y.verdict.tier || x.dex - y.dex || (x._sk - y._sk);
     return 0;
   });
   if (!list.length) {
@@ -210,12 +230,58 @@ function openDetail(f) {
       <p class="muted" style="font-size:11px">快招累積能量後，於極巨階段放招；攻擊槽的極巨招式隨特殊招式屬性變化</p></div>`;
   }
 
+  // 淨化建議（僅暗影行）：去留價值 vs 淨百收機 vs 淨化省資源
+  let purifyHtml = '';
+  if (tags.includes('shadow')) {
+    const t = f.verdict.tier;
+    const body = t <= 1
+      ? '· <b>先別急著淨化</b>：暗影攻擊 ×1.2 是這隻保留價值的主要依據，淨化後就沒了。<br>· 例外：只差百等收藏、或你手上已有另一隻可用的暗影，淨化會更省資源。'
+      : t === 2
+        ? '· <b>可淨可留：</b>留著＝保有攻擊 ×1.2 的暗影戰力；淨化＝IV 全家 +2、強化省星塵糖果、Return 招式隨時可用學習器移除（暗影的 Frustration 只能在活動期間移除）。<br>· 這隻暗影名次不算突出，兩種都合理——看你想要暗影戰力還是省資源。'
+        : '· <b>淨化較划算：</b>這隻的暗影指標不高，淨化後 IV +2／+2／+2、強化費用更低，還能趁需要時換招。<br>· 注意淨化是單向的——看完判定保留價值後再決定，清包前想好。';
+    purifyHtml = `<section><h3>淨化建議</h3><div class="ivref">${body}<br><br>
+      <b>淨百規則：</b>淨化把 IV 每項 +2（最高到 15）；原始攻／防／血都 <b>13 以上</b>的個體，淨化後即 15/15/15（淨百）。
+      可用下方計算機輸入暗影個體 IV 預覽淨化後數值。</div></section>`;
+  }
+
+  // 推薦帶法（PvPoke 排行組合＋PvE 估算最佳組合）
+  let recHtml = '';
+  {
+    const nm = id => ((DATA.moves || {})[id] || {}).n || id;
+    const lines = [];
+    for (const L of [500, 1500, 2500, 10000]) {
+      const p = f.pvp[L];
+      if (p && p.mv && p.mv.length) {
+        const cn = p.mv.slice(1).filter(Boolean).map(nm);
+        lines.push(`${LEAGUE_NAME[L]}排行 ${p.r ? '#' + p.r : '—'}：<span class="fast">${nm(p.mv[0])}</span>${cn.map(x => `<span class="charged">${x}</span>`).join('')}`);
+      }
+    }
+    if (f.pve && f.pve.f) {
+      lines.push(`PvE 估算最佳：<span class="fast">${nm(f.pve.f)}</span>${f.pve.c ? `<span class="charged">${nm(f.pve.c)}</span>` : '<i>（純快招循環）</i>'}`);
+    }
+    if (lines.length) recHtml = `<div class="ivref" style="margin-top:6px"><b>推薦帶法</b>（PvPoke 排行組合＋PvE 估算最佳組合；實帶以你自己的配置為準）<br>${lines.join('<br>')}</div>`;
+  }
+
+  // 極巨戰估算（dm/dmg 行）：與普通 PvE 分開衡量
+  let dmxHtml = '';
+  if (f.dmx && (f.dm || f.dmg)) {
+    const atkPct = Math.max(0.1, 100 - f.dmx.pct).toFixed(1).replace(/\.0$/, '');
+    dmxHtml = `<section><h3>極巨戰（Max Battle）攻擊估算</h3><table class="stats">
+      <tr><td>極巨攻擊循環 DPS 估算</td><td>${f.dmx.dps}</td></tr>
+      <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（可極巨化型態內）</td></tr></table>
+      <div class="ivref" style="margin-top:6px">Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主（威力 250、屬性隨特殊招式變化）——衡量尺度和普通 PvE 不同，別互相套用。<br>
+      · 這個排名看「攻擊體質＋快招集能速度」；要一場連發多發極巨攻擊，也參考有效體質（撐到第六階段就得多發）。<br>
+      ${f.dmg ? '· 超極巨化個體攻擊槽是專屬超極巨招式，目標類型有差但威力同屬 250 尺度，估算一併適用。' : ''}</div></section>`;
+  }
+
   $('#detailBody').innerHTML = `
     <h2>${f.zh}</h2><div class="en">${f.en} · #${f.dex} · id: ${f.id}</div>
     <img class="sprite${f.id.endsWith('_shadow') ? ' shadowicon' : ''}" src="${spriteOf(f)}" alt="${f.zh} 的遊戲內圖示">
     <div class="vchip t${f.verdict.tier}" style="width:100%;display:block">${f.verdict.tierName}</div>
 
     <section><h3>判定理由</h3><ul class="why">${f.verdict.why.map(w => `<li>${w}</li>`).join('')}</ul></section>
+
+    ${purifyHtml}
 
     ${f.megas ? `<section><h3>超級進化／原始回歸型態（母體進行）</h3><div class="megalist">${f.megas.map(m => `
       <div class="megabox"><img class="megasprite" src="${UICONS}${m.icon}" alt="${m.zlabel}">
@@ -240,6 +306,8 @@ function openDetail(f) {
         · 防／血 IV 確實影響「能挨幾下打」，但 GO 的傷害計算<b>取整數</b>，IV 的小幅起伏大多不會改變挨打次數——決定挨幾下的是<b>物種體質與等級</b>；IV 差異常常一整場團體戰都不會變成多挨或少挨一下。<br>
         · 強度百分位偏低的型態，就算攻 IV 滿也沒必要留。</div>` : '無招式資料'}</section>
 
+    ${dmxHtml}
+
     <section><h3>建議對戰 IV（rank 1 參考）</h3><div class="ivlines">${ivRefs}</div>
       <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div></section>
 
@@ -261,7 +329,7 @@ function openDetail(f) {
       ${f.li ? '<tr><td></td><td>⚠ 超級聯盟禁入</td></tr>' : ''}
     </table></section>
 
-    <section><h3>招式</h3><div class="moves">${fast}${charged}</div>${maxBlock}</section>
+    <section><h3>招式</h3><div class="moves">${fast}${charged}</div>${recHtml}${maxBlock}</section>
 
     <section><h3>我的收藏</h3>
       <button class="markBtn" id="markBtn">${marks[f.id] ? '✓ 已標記：' + marks[f.id] + '（再點一次取消）' : '標記這隻（點擊循環：保留 → 可送 → 已送）'}</button>
@@ -312,6 +380,13 @@ function runIvCalc() {
     else if (r.rank <= 700) { grade = '看情況'; color = 'var(--maybe)'; }
     else { grade = '可傳送（缺圖鑑除外）'; color = 'var(--send)'; }
     const ref = current.iv && current.iv[cap];
+    // 暗影個體：順帶預覽淨化後的 IV（淨化每項 +2、最高 15）
+    let purifyLine = '';
+    if ((current.tags || []).includes('shadow')) {
+      const pv = ivs.map(v => Math.min(15, v + 2));
+      const hundo = pv.every(v => v === 15);
+      purifyLine = `<br>淨化後 IV：<b>${pv.join('/')}</b>${hundo ? '（<b>淨百！</b>淨化即變 15/15/15）' : ''}`;
+    }
     const cupLine = cupCd ? `<br>盃賽情報：在「${cupCd.zh}（CP${cupCd.cp}）」排行第 <b>${cupBest[1]}</b> 名／榜單共 ${cupCd.total} 型態` : '';
     const spLine = spRank != null
       ? `物種在${LEAGUE_NAME[cap]}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
@@ -320,7 +395,7 @@ function runIvCalc() {
       ${spLine}${cupLine}<br>
       最佳等級 Lv${r.level}、CP ${r.cp}
       ${ref ? `<br>rank1 參考 IV：${ref.slice(1).join('/')}（Lv${ref[0]}）` : ''}
-      <br><span style="color:var(--muted);font-size:11px">PvP 體質愈接近「攻低、防高、血高」名次愈好；但物種本身的排名才是天花板</span>`;
+      <br><span style="color:var(--muted);font-size:11px">PvP 體質愈接近「攻低、防高、血高」名次愈好；但物種本身的排名才是天花板</span>${purifyLine}`;
 }
 
 /* ---------- 收藏 ---------- */
@@ -383,11 +458,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=10').then(r => {
+fetch('data/data.json?v=11').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
   DATA = d; FORMS = d.forms;
+  assignSortKeys();
   $('#loadingState') && $('#loadingState').remove();
   // 屬性下拉
   const types = [...new Set(FORMS.flatMap(f => f.t))].sort();

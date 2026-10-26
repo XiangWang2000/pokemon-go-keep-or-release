@@ -163,7 +163,7 @@ try { maxData = JSON.parse(fs.readFileSync('data/max.json', 'utf8')); } catch (e
 function loadRankings(file) {
   const arr = JSON.parse(fs.readFileSync(file, 'utf8'));
   const map = {};
-  arr.forEach((e, i) => { map[e.speciesId] = { r: i + 1, rating: e.rating, moves: e.moves }; });
+  arr.forEach((e, i) => { map[e.speciesId] = { r: i + 1, rating: e.rating, moveset: e.moveset }; });
   return map;
 }
 const ranks = {
@@ -289,49 +289,89 @@ const cpm50 = (c, l) => (l === Math.floor(l) ? c[l - 1] : (c[Math.floor(l) - 1] 
 // - 每招各自套 STAB ×1.2；暗影個體攻擊 ×1.2
 // - GO GM 缺招式時退回 PvPoke 數值近似（duration→cd、energy→成本），漏的招式會列出
 let pveFallbackMoves = 0;
+// 共用：GO GM 招式查表（缺招退回 PvPoke 數值近似）
+function getGoMove(id) {
+  const m = goGm.moves && goGm.moves[id];
+  if (m) return m;
+  // PvPoke fallback：cd(優秒)／e(PvP 能量成本當 PvE 消耗)
+  const pp = moves[id];
+  if (!pp || pp.p <= 0) return null;
+  pveFallbackMoves++;
+  return { type: pp.t, power: pp.p, durationMs: pp.cd, energyDelta: (id && pp.e > 0) ? -pp.e : pp.g ? pp.g : 0 };
+}
 function pveCalc(p) {
   const shadowAtk = /_shadow$/.test(p.speciesId) ? 1.2 : 1;
   const atkStat = (p.baseStats.atk + 15) * CPM_L40 * shadowAtk;
   const defStat = (p.baseStats.def + 15) * CPM_L40;
   const hpStat = (p.baseStats.hp + 15) * CPM_L40;
   const stag = t => (p.types && p.types.includes(t)) ? 1.2 : 1.0;
-  const getGo = (id) => {
-    const m = goGm.moves && goGm.moves[id];
-    if (m) return m;
-    // PvPoke fallback：cd(優秒)／e(PvP 能量成本當 PvE 消耗)
-    const pp = moves[id];
-    if (!pp || pp.p <= 0) return null;
-    pveFallbackMoves++;
-    return { type: pp.t, power: pp.p, durationMs: pp.cd, energyDelta: (id && pp.e > 0) ? -pp.e : pp.g ? pp.g : 0 };
-  };
-  const fastList = (p.fastMoves || []).map(getGo).filter(m => m && m.power > 0 && m.energyDelta > 0);
-  if (!fastList.length) return null;
-  const fCalc = fastList.map(f => {
-    const dur = f.durationMs / 1000;
-    return { f, dps: f.power * stag(f.type) / dur, eps: f.energyDelta / dur };
+  const fastRaw = (p.fastMoves || []).map(id => ({ id, m: getGoMove(id) }))
+    .filter(x => x.m && x.m.power > 0 && x.m.energyDelta > 0);
+  if (!fastRaw.length) return null;
+  const fCalc = fastRaw.map(x => {
+    const dur = x.m.durationMs / 1000;
+    return { id: x.id, m: x.m, dps: x.m.power * stag(x.m.type) / dur, eps: x.m.energyDelta / dur };
   });
-  const chargedList = (p.chargedMoves || []).map(getGo).filter(m => m && m.power > 0 && m.energyDelta < 0);
+  const chargedRaw = (p.chargedMoves || []).map(id => ({ id, m: getGoMove(id) }))
+    .filter(x => x.m && x.m.power > 0 && x.m.energyDelta < 0);
   let dps;
-  if (!chargedList.length) {
+  let best = { f: null, c: null };
+  if (!chargedRaw.length) {
     // 無蓄力（Yawn 之類）：純快招
-    dps = Math.max(...fCalc.map(fc => fc.dps));
+    const top = fCalc.reduce((b, x) => (x.dps > b.dps ? x : b), fCalc[0]);
+    dps = top.dps;
+    best.f = top.id;
   } else {
     dps = 0;
     for (const fc of fCalc) {
-      for (const c of chargedList) {
-        const cost = -c.energyDelta;
+      for (const c of chargedRaw) {
+        const m = c.m;
+        const cost = -m.energyDelta;
         const nFast = Math.max(1, Math.ceil(cost / fc.eps));
-        const power = nFast * fc.f.power * stag(fc.f.type) + c.power * stag(c.type);
-        const time = nFast * fc.f.durationMs / 1000 + c.durationMs / 1000;
+        const power = nFast * fc.m.power * stag(fc.m.type) + m.power * stag(m.type);
+        const time = nFast * fc.m.durationMs / 1000 + m.durationMs / 1000;
         const comboDps = power / time;
-        if (comboDps > dps) dps = comboDps;
+        if (comboDps > dps) { dps = comboDps; best = { f: fc.id, c: c.id }; }
       }
     }
   }
   const effective = dps * atkStat / 70;   // 除以固定防守參考值(相對比較用)
   const ehp = hpStat * defStat * 0.3;     // TDO 近似
   const weight = effective * Math.sqrt(ehp) * 0.01;
-  return { dps: +dps.toFixed(2), score: +effective.toFixed(1), weight: +weight.toFixed(2) };
+  return {
+    dps: +dps.toFixed(2), score: +effective.toFixed(1), weight: +weight.toFixed(2),
+    f: best.f || undefined, c: best.c || undefined, // 最佳組合（move id，供詳細頁顯示）
+  };
+}
+
+// ---------- 極巨戰（Max Battle）攻擊估算 ----------
+// 與一般 PvE 分開估：Max Battle 只有極巨化個體可參戰，輸出由「極巨攻擊」主導。
+// 模型（估算值，常數只影響絕對值、不影響同池百分位比較）：
+// - GO 極巨攻擊基礎威力固定 250（超極巨專屬招式威力略異，一併以 250 近似，屬性照特殊招式）
+// - 暫存條以快招集能填滿：滿條成本尺度 MAX_METER 為共用常數，極巨攻擊動畫 MAX_ATK_DUR 秒亦同
+// - 每次極巨攻擊傷害 ∝ 威力 × STAB × 攻擊體質 → 相對差異來自：STAB 類型、攻種族值、快招集能速度
+const MAX_BP = 250, MAX_METER = 100, MAX_ATK_DUR = 2;
+function dmxCalc(p) {
+  const stag = t => (p.types && p.types.includes(t)) ? 1.2 : 1.0;
+  const fastRaw = (p.fastMoves || []).map(id => getGoMove(id))
+    .filter(m => m && m.power > 0 && m.energyDelta > 0);
+  if (!fastRaw.length) return null;
+  const chargedTypes = [...new Set((p.chargedMoves || []).map(id => getGoMove(id))
+    .filter(m => m && m.power > 0 && m.energyDelta < 0).map(m => m.type))];
+  if (!chargedTypes.length) chargedTypes.push(fastRaw[0].type);
+  const atkStat = (p.baseStats.atk + 15) * CPM_L40;
+  let best = 0;
+  for (const fm of fastRaw) {
+    const dur = fm.durationMs / 1000;
+    const eps = fm.energyDelta / dur;
+    const nFast = Math.max(1, Math.ceil(MAX_METER / eps));
+    const cycle = nFast * dur + MAX_ATK_DUR;
+    for (const t of chargedTypes) {
+      const rate = MAX_BP * stag(t) * atkStat / 70 / cycle;
+      if (rate > best) best = rate;
+    }
+  }
+  return { dps: +best.toFixed(2) };
 }
 
 // ---------- 建立型態清單 ----------
@@ -373,7 +413,7 @@ for (const p of gm.pokemon) {
   const pvp = {};
   for (const L of LEAGUES) {
     const e = ranks[L][p.speciesId];
-    pvp[L] = e ? { r: e.r, rating: e.rating } : null;
+    pvp[L] = e ? { r: e.r, rating: e.rating, mv: e.moveset || undefined } : null; // mv＝PvPoke 推薦招式組合 [快, 蓄1, 蓄2]
   }
 
   // 建議保留 IV（PvPoke 提供的各聯賽 rank1 參考）
@@ -407,7 +447,7 @@ for (const p of gm.pokemon) {
   // 極巨化/超極巨化（data/max.json 由 pokemondb 極巨化清單解析而來）
   if (maxData) {
     const mx = maxData[p.speciesId];
-    if (mx) { entry.dm = true; if (mx.dmg) entry.dmg = true; }
+    if (mx) { entry.dm = true; entry.dmx = dmxCalc(p); if (mx.dmg) entry.dmg = true; }
   }
   all.push(entry);
 }
@@ -457,6 +497,7 @@ if (maxData) {
     d.icon = (uiconsFiles && uiconsFiles.has(e.dex + '_b1.png')) ? e.dex + '_b1.png' : e.icon;
     dmaxExtra.push(d);
     delete e.dm; // 一般個體另以標記判斷，不再帶能力資訊
+    delete e.dmx; // 一般個體不能極巨化，估算一併移除（d 副本已繼承 dmx）
   }
   all.push(...dmaxExtra);
   console.log('極巨化獨立型態:', dmaxExtra.length);
@@ -469,6 +510,17 @@ for (const e of all) {
   if (!e.pve) continue;
   const i = weights.findIndex(w => w >= e.pve.weight); // 近似百分位
   e.pve.pct = +(((i + 1) / weights.length) * 100).toFixed(1);
+}
+
+// ---------- 極巨戰攻擊百分位 ----------
+// 分布＝全部可極巨化／超極巨化行（攻手池內的相對位置）
+if (all.some(e => e.dmx)) {
+  const dw = all.filter(e => e.dmx && e.dmx.dps > 0).map(e => e.dmx.dps).sort((a, b) => a - b);
+  for (const e of all) {
+    if (!e.dmx) continue;
+    const i = dw.findIndex(w => w >= e.dmx.dps);
+    e.dmx.pct = +(((i + 1) / dw.length) * 100).toFixed(1);
+  }
 }
 
 // ---------- 有效體質（守道館指標 bulkPct） ----------
@@ -666,22 +718,39 @@ for (const e of all) judge(e);
 
 // ---------- 可極巨化的一般型態地板 ----------
 // Max Battle 可用個體，不至於「可傳送」（超極巨化個體另有 tier0 判定）
-// 角色感知：有效體質前 5% 的物種在 Max Battle 是坦克／輔助位——社群共識「必練一隻體質好的」
+// 攻手感知：極巨攻擊估算在攻手池前段的 → 建議保留（社群共識的 dMax 強攻手，
+// 如龍頭地鼠：普通 PvP／PvE 都不突出，極巨戰卻是頂尖打輸出的人選）；
+// 坦克感知：有效體質前 5% 的物種在 Max Battle 是坦克／輔助位——社群共識「必練一隻體質好的」
 // （Max Spirit 以自身血量百分比補全隊、Max Guard 護隊，如幸福蛋/卡比獸），給建議保留而非看情況；
 // 注意 Power Spot 可重複遭遇，建議是「練一隻好 IV」而非囤個體 → tier1 不给 tier0
+const DMX_ATTACKER_PCT = 90; // 極巨攻擊估算百分位門檻（攻手池內）
 for (const e of all) {
-  if (!e.dm || e.verdict.tier < 3) continue;
+  if (!e.dm) continue;
+  const tier = e.verdict.tier;
+  if (tier !== 2 && tier !== 3) continue; // tier0/tier1 已有更強理由，不動
   const topPct = Math.max(1, Math.round(100 - e.bulkPct));
-  if (e.bulkPct >= 95) {
+  const regionalNote = (e.tags || []).includes('regional') ? '（另外這是區域限定，至少留一隻做收藏）' : '';
+  if (e.dmx && e.dmx.pct >= DMX_ATTACKER_PCT) {
     e.verdict.tier = 1;
+    const atkPct = Math.max(1, Math.round(100 - e.dmx.pct));
     e.verdict.why = [
-      `Max Battle 的核心坦克／輔助位：有效體質（HP×DEF）排行前 ${topPct}%，` +
-      'Max Spirit 補血量隨自身血量水漲船高、Max Guard 替全隊擋傷——社群共識必練一隻體質好的',
-      '技能投資方向：Max Spirit / Max Guard 優先，攻擊招不用點高；Power Spot 可重複遭遇，練好一隻即可，不必囤',
+      `Max Battle 強力攻手：極巨攻擊估算在可極巨化型態中排名前 ${atkPct}%——` +
+      'Max Battle 只有極巨化個體能出戰、輸出以極巨攻擊為主，這隻屬於要練的第一批' + regionalNote,
+      '技能投資方向：快招集能快＋專屬極巨攻擊屬性即可；適用 IV 不用太挑（Power Spot 可重複遭遇）',
     ];
-  } else {
-    e.verdict.tier = 2;
-    e.verdict.why = ['可極巨化：Max Battle 攻手池的一員，建議至少保留一隻適用 IV'];
+  } else if (tier === 3) {
+    // tier3 地板：坦克或一般攻手池
+    if (e.bulkPct >= 95) {
+      e.verdict.tier = 1;
+      e.verdict.why = [
+        `Max Battle 的核心坦克／輔助位：有效體質（HP×DEF）排行前 ${topPct}%，` +
+        'Max Spirit 補血量隨自身血量水漲船高、Max Guard 替全隊擋傷——社群共識必練一隻體質好的',
+        '技能投資方向：Max Spirit / Max Guard 優先，攻擊招不用點高；Power Spot 可重複遭遇，練好一隻即可，不必囤',
+      ];
+    } else {
+      e.verdict.tier = 2;
+      e.verdict.why = ['可極巨化：Max Battle 攻手池的一員，建議至少保留一隻適用 IV'];
+    }
   }
 }
 
