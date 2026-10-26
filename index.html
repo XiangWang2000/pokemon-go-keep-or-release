@@ -33,7 +33,10 @@
       <option value="regional">區域限定</option>
       <option value="nfe">未完全進化</option>
       <option value="iv">有 IV 參考（對戰用）</option>
-      <option value="mine">我的收藏</option>
+      <option value="mine">我的標記（全部）</option>
+      <option value="mine_keep">我的標記：保留</option>
+      <option value="mine_maybe">我的標記：可送</option>
+      <option value="mine_sent">我的標記：已送</option>
     </select>
     <select id="filterGen" aria-label="篩選：世代">
       <option value="">全部世代</option>
@@ -67,7 +70,7 @@
       <p><b>卡片右上角徽章</b>：<b>極</b>＝可參加極巨戰、<b>G·巨</b>＝可參加超極巨化戰、<b>超</b>＝有超級進化形態；頭像有紫光＝暗影。
       <br><b>卡片下方小字</b>：<code>CP · 聯盟名次 · PvE 前 X% · Max 前 X%</code>（有才顯示）——<code>#</code> 是名次、<b>愈小愈強</b>；<code>前 X%</code> 是強度排名、<b>數字愈小愈強</b>。</p>
       <p><b>同一隻寶可夢可能有好幾張卡</b>——本體、暗影、超級進化、極巨化…各有獨立評級，要分別看。</p>
-      <p><b>名詞小抄：</b>PvP＝玩家對戰（聯盟）；PvE＝打道館／團體戰；DPS＝每秒輸出傷害；IV／個體值＝天生素質（攻／防／血各 0–15，後天改不了、淨化可 +2）；STAB／屬性一致＝招式屬性與自身相同時傷害 ×1.2；meta＝現行環境的主流強度；PvPoke＝知名對戰排行網站（本站榜單來源）；淨百＝淨化後剛好 15/15/15。</p>
+      <p><b>名詞小抄：</b>PvP＝玩家對戰（聯盟）；PvE＝打道館／團體戰；DPS＝每秒輸出傷害；循環 DPS＝快招＋蓄力招輪轉的平均每秒傷害；IV／個體值＝天生素質（攻／防／血各 0–15，後天改不了、淨化可 +2）；種族值＝物種天生的基礎數值（同物種每隻都一樣）；STAB／屬性一致＝招式屬性與自身相同時傷害 ×1.2；meta＝現行環境的主流強度；PvPoke＝知名對戰排行網站（本站榜單來源）；淨百＝淨化後剛好 15/15/15；<b>小小盃＝500 CP 上限的活動賽制</b>；超級／高級／大師聯盟＝CP 上限 1500／2500／無上限。</p>
       <p id="dataDate" style="color:var(--muted);font-size:11px;margin:0"></p>
     </div>
   </details>
@@ -79,6 +82,6 @@
   <div id="detailBody"></div>
 </aside>
 <div id="toast" role="status"></div>
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 </body>
 </html>
