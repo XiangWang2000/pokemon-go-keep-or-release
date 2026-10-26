@@ -4,7 +4,18 @@ const TYPE_BG = { normal: '#928b7e', fire: '#e8743a', water: '#4c8ad1', electric
 const LEAGUE_NAME = { 500: '小小盃', 1500: '超級聯盟', 2500: '高級聯盟', 10000: '大師聯盟' };
 const TIER_NAME = ['必留', '建議保留', '看情況', '可傳送'];
 
-let DATA = null, FORMS = [], filtr = { search: '', tier: '', type: '', extra: '', sort: 'dex' };
+let DATA = null, FORMS = [], filtr = { search: '', tier: '', type: '', extra: '', gen: '', sort: 'dex' };
+
+// 世代用全國圖鑑號區段判定（圖鑑號在 GO 沿用主系列，不隨形態變動）
+const GEN_RANGES = { 1: [1, 151], 2: [152, 251], 3: [252, 386], 4: [387, 493], 5: [494, 649], 6: [650, 721], 7: [722, 809], 8: [810, 905], 9: [906, 9999] };
+const REGION_TAGS = ['alolan', 'galarian', 'hisuian', 'paldean'];
+// 同圖鑑號內的階段序：一般 → 暗影 → 極巨化 → 超極巨化；地區形態排在關都本體之後
+function formOrderRank(f) {
+  const tags = f.tags || [];
+  const regional = REGION_TAGS.some(t => tags.includes(t)) ? 1 : 0;
+  const stage = f.dmg ? 3 : f.dm ? 2 : tags.includes('shadow') ? 1 : 0;
+  return stage * 2 + regional;
+}
 let current = null, curLeague = '1500';
 let lastFocus = null; // 開詳細面板前的焦點元素，關閉時歸位
 
@@ -144,6 +155,7 @@ function passFilter(f) {
     if (filtr.extra === 'iv' && !f.iv || filtr.extra === 'iv' && !Object.keys(f.iv || {}).length) return false;
     if (filtr.extra === 'mine' && !marks[f.id]) return false;
   }
+  if (filtr.gen) { const r = GEN_RANGES[filtr.gen]; if (!(f.dex >= r[0] && f.dex <= r[1])) return false; }
   return true;
 }
 
@@ -151,17 +163,17 @@ function render() {
   const list = FORMS.filter(passFilter);
   const key = filtr.sort;
   list.sort((x, y) => {
-    if (key === 'dex') return x.dex - y.dex || x.zh.localeCompare(y.zh, 'zh-Hant');
+    if (key === 'dex') return x.dex - y.dex || formOrderRank(x) - formOrderRank(y);
     if (key === 'cp') return y.cp50 - x.cp50;
     if (key === 'pvp') { const bx = bestRank(x), by = bestRank(y); return (bx ? bx.r : 9999) - (by ? by.r : 9999); }
     if (key === 'pve') return (y.pve?.pct ?? -1) - (x.pve?.pct ?? -1);
-    if (key === 'tier') return x.verdict.tier - y.verdict.tier || x.dex - y.dex;
+    if (key === 'tier') return x.verdict.tier - y.verdict.tier || x.dex - y.dex || formOrderRank(x) - formOrderRank(y);
     return 0;
   });
   if (!list.length) {
     // 空狀態要教你怎麼回來，不是只說「沒有」
     grid.innerHTML = `<div class="state">找不到符合條件的型態。<br>
-      可以<b>清空搜尋框</b>、把評級／屬性／類別選回「全部」，或換個關鍵字再試一次。</div>`;
+      可以<b>清空搜尋框</b>、把評級／屬性／類別／世代選回「全部」，或換個關鍵字再試一次。</div>`;
   } else {
     grid.innerHTML = list.map(cardHtml).join('');
   }
@@ -329,6 +341,7 @@ $('#search').addEventListener('input', e => {
 $('#filterTier').addEventListener('change', e => { filtr.tier = e.target.value; render(); });
 $('#filterType').addEventListener('change', e => { filtr.type = e.target.value; render(); });
 $('#filterExtra').addEventListener('change', e => { filtr.extra = e.target.value; render(); });
+$('#filterGen').addEventListener('change', e => { filtr.gen = e.target.value; render(); });
 $('#sortBy').addEventListener('change', e => { filtr.sort = e.target.value; render(); });
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
 {
@@ -370,7 +383,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=9').then(r => {
+fetch('data/data.json?v=10').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {

@@ -140,6 +140,7 @@ GO GM 缺的招式退回 PvPoke 數值近似並計數輸出。手算校驗案例
 ## 前端細節
 
 - 卡片啟用 `content-visibility: auto`（畫面外卡片跳過排版與繪製）、圖片掛 `loading="lazy" decoding="async"`、搜尋輸入 150ms 防抖；1717 張卡全量 rerender 約 25ms，圖檔只抓可視範圍。
+- 預設圖鑑排序的同 dex tiebreak 用 `formOrderRank`：一般 → 暗影 → 極巨化 → 超極巨化，\n  同階段內關都本體在前、地區形態緊跟（不用中文名 localeCompare，避免穿插）。世代篩選以全國圖鑑號區段判定（`GEN_RANGES`）。
 - IV 計算機：半級 CPM 用 GO GameMaster 真值表（非相鄰整數取平均）；
   CP 計算不含暗影倍率（與 GO、PvPoke 的 calculateCP 一致；×1.2／×0.8333 只影響戰鬥體質乘積）。
 - 守道館指標：詳細頁「種族值＆上限」區提供有效體質百分位（前 5% 才顯示）。
