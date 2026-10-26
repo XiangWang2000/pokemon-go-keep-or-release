@@ -240,9 +240,9 @@ table.stats td:last-child b { color: var(--text); }
   border-radius: var(--r-md); padding: 8px 12px; cursor: pointer; font-family: inherit;
   transition: filter .15s var(--ease-out), transform .15s var(--ease-out);
 }
-#ivCalc button { width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; }
-#ivCalc button:hover, .markBtn:hover { filter: brightness(1.1); }
-#ivCalc button:active, .markBtn:active { transform: translateY(1px); }
+#detail button { width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; }
+#detail button:hover, .markBtn:hover { filter: brightness(1.1); }
+#detail button:active, .markBtn:active { transform: translateY(1px); }
 #ivResult { margin-top: 10px; font-size: 13px; line-height: 1.7; font-variant-numeric: tabular-nums; }
 .grade { display: inline-block; padding: 2px 10px; border-radius: var(--r-sm); font-weight: 700; }
 

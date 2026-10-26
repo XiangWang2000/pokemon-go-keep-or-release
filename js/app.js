@@ -466,8 +466,8 @@ function runIvCalc() {
     }
     const cupLine = cupCd ? `<br>盃賽情報：在「${cupCd.zh}（CP${cupCd.cp}）」排行第 <b>${cupBest[1]}</b> 名／榜單共 ${cupCd.total} 型態` : '';
     const spLine = spRank != null
-      ? `物種在${capName(cap)}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
-      : `物種未進入${capName(cap)}排行榜＋IV 排名是 #${r.rank}/${r.total}`;
+      ? `物種在${cap === 500 ? '500 格式總榜' : capName(cap)}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
+      : `物種未進入${cap === 500 ? '500 格式總榜' : capName(cap)}排行榜＋IV 排名是 #${r.rank}/${r.total}`;
     $('#ivResult').innerHTML = `<span class="grade" style="background:${color};color:#141420">${grade}</span><br>
       ${spLine}${cupLine}<br>
       最佳等級 Lv${r.level}、CP ${r.cp}
@@ -536,7 +536,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=16').then(r => {
+fetch('data/data.json?v=17').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
