@@ -541,8 +541,20 @@ if (all.some(e => e.dmx)) {
 
 // ---------- 保留 / 傳送判定 ----------
 function bestRank(e) {
+  // 優先主力聯盟（超級／高級／大師）；小小盃（500 CP 活動賽制）只在都沒名次時才當代表——
+  // 避免「小小盃 #41」把六尾之類的物種灌成 tier0（對戰頂尖），跟卡面顯示的主力聯盟名次自相矛盾
   let best = null;
-  for (const L of [500, 1500, 2500, 10000]) {
+  for (const L of [1500, 2500, 10000]) {
+    const r = e.pvp[L] && e.pvp[L].r;
+    if (r && (r < (!best ? Infinity : best.r))) best = { r, L };
+  }
+  if (!best && e.pvp[500] && e.pvp[500].r) best = { r: e.pvp[500].r, L: 500 };
+  return best;
+}
+// 判定主依據：只看主力聯盟。小小盃的價值由一般分支的「限制盃人選」（cupR top50）與次級註記處理
+function bestStd(e) {
+  let best = null;
+  for (const L of [1500, 2500, 10000]) {
     const r = e.pvp[L] && e.pvp[L].r;
     if (r && (r < (!best ? Infinity : best.r))) best = { r, L };
   }
@@ -617,7 +629,7 @@ if (cupData) {
 function judge(e) {
   const tags = e.tags;
   const reasons = [];
-  const b = bestRank(e);
+  const b = bestStd(e);
   let tier; // 0 必留 / 1 建議保留 / 2 看情況 / 3 可傳送
   const rankReason = (L, threshold) => {
     const rr = e.pvp[L] && e.pvp[L].r;
@@ -782,7 +794,7 @@ for (const e of all) {
       if (lineIndep(e)) continue; // 區域/傳說等：理由非進化線，保留原判
       if (/_(gmax|dmax)$/.test(e.id)) continue;     // 極巨化拆分行：另有地板規則，不降級
       // 自身名次夠硬的 NFE 不連坐（自身就是戰力，進化線終點再爛也值得留這隻）
-      const bn = bestRank(e);
+      const bn = bestStd(e);
       if ((bn && bn.r <= 60) || (e.cupR && e.cupR[0] && e.cupR[0][1] <= 10)) continue;
       const ends = reachable(e, new Set());
       if (!ends.length) continue;               // 進化後型態未實裝 → 保守不動
@@ -808,6 +820,19 @@ for (const e of all) {
   if ((e.verdict.why || []).some(w => w && w.includes('Max Battle'))) continue; // 攻手升級行已有主理由
   const atkPct = Math.max(1, Math.round(100 - e.dmx.pct));
   e.verdict.why.push(`Max Battle 攻手：極巨攻擊估算在可極巨化型態中排名前 ${atkPct}%（Max Battle 的攻擊衡量尺度，與上面所據不同）`);
+}
+
+// ---------- 小小盃次級註記 ----------
+// 判定改以主力聯盟（超級／高級／大師）為主之後，小小盃（500 CP 活動賽制）名次
+// 降級為附加資訊：tier1/2 的行若小小盃 ≤50 名，附一條註記（特殊賽制強，不當主依據）
+for (const e of all) {
+  const lc = e.pvp[500] && e.pvp[500].r;
+  if (!lc || lc > 50) continue;
+  const t = e.verdict.tier;
+  if (t === 0 || t === 3) continue;
+  const why = e.verdict.why || [];
+  if (why.some(w => w && w.includes('小小盃'))) continue;
+  why.push(`另為小小盃（500 CP 活動賽制）排行第 ${lc} 名——特殊賽制下的頂尖人選，一般聯盟對戰可忽略`);
 }
 for (const e of all) e.verdict.tierName = TIER_NAME[e.verdict.tier];
 

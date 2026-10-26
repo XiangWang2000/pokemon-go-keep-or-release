@@ -40,6 +40,12 @@ let current = null, curLeague = '1500';
 let lastFocus = null; // 開詳細面板前的焦點元素，關閉時歸位
 
 const $ = s => document.querySelector(s);
+// 篩選／排序持久化：誤關分頁回來不用重設（搜尋、五個下拉都保留）
+try { Object.assign(filtr, JSON.parse(localStorage.getItem('pogo_filtr') || '{}')); } catch (e) {}
+$('#filterTier').value = filtr.tier; $('#filterType').value = filtr.type;
+$('#filterExtra').value = filtr.extra; $('#filterGen').value = filtr.gen;
+$('#sortBy').value = filtr.sort; $('#search').value = filtr.search;
+function saveFiltr() { try { localStorage.setItem('pogo_filtr', JSON.stringify(filtr)); } catch (e) {} }
 const grid = $('#grid');
 
 const UICONS = 'https://raw.githubusercontent.com/WatWowMap/wwm-uicons/master/pokemon/';
@@ -66,6 +72,12 @@ function bestRank(f) {
   }
   if (!best && f.pvp[500]) best = { r: f.pvp[500].r, L: 500 };
   return best;
+}
+// 聯盟／盃賽上限的顯示名：主力聯盟用 LEAGUE_NAME，特殊盃用 cups 資料的名稱
+function capName(cp) {
+  if (LEAGUE_NAME[cp]) return LEAGUE_NAME[cp];
+  const c = ((DATA && DATA.cups) || []).find(x => x.cp === +cp);
+  return c ? c.zh : 'CP' + cp;
 }
 
 /* ---------- CP / IV 排名計算 ---------- */
@@ -148,7 +160,7 @@ function cardHtml(f) {
   // 卡片小字統一列出各衡量尺度的位置（存在就顯示，不是「適合哪邊」的意思）
   const mini = [
     f.cp50 ? 'CP ' + f.cp50 : '',
-    b ? LEAGUE_NAME[b.L] + ' #' + b.r : '',
+    b && b.r <= 500 ? LEAGUE_NAME[b.L] + ' #' + b.r : '', // #501 之後的尾段名次對新手無意義，不上卡面（詳細頁仍有全榜）
     f.pve && f.pve.pct != null ? 'PvE 前 ' + fmt(f.pve.pct) + '%' : '',
     f.dmx && f.dm ? 'Max 前 ' + fmt(f.dmx.pct) + '%' : '',
   ].filter(Boolean).join(' · ');
@@ -182,6 +194,10 @@ function passFilter(f) {
     if (filtr.extra === 'nfe' && !f.nfe) return false;
     if (filtr.extra === 'iv' && !f.iv || filtr.extra === 'iv' && !Object.keys(f.iv || {}).length) return false;
     if (filtr.extra === 'mine' && !marks[f.id]) return false;
+    if ((filtr.extra === 'mine_keep' || filtr.extra === 'mine_maybe' || filtr.extra === 'mine_sent')) {
+      const want = { mine_keep: '保留', mine_maybe: '可送', mine_sent: '已送' }[filtr.extra];
+      if (marks[f.id] !== want) return false;
+    }
   }
   if (filtr.gen) { const r = GEN_RANGES[filtr.gen]; if (!(f.dex >= r[0] && f.dex <= r[1])) return false; }
   return true;
@@ -207,7 +223,7 @@ function render() {
   }
   // 計數行：標明資料更新日（新手需要知道資料新不新）；有標記就附統計，清包時一眼看清
   let cntLine = `共 ${list.length} 個型態（資料庫共 ${FORMS.length} 個）`;
-  if (DATA.meta && DATA.meta.date) cntLine += ` · 資料更新 ${DATA.meta.date}`;
+  if (DATA.meta && DATA.meta.date) cntLine += ` · 資料更新 ${DATA.meta.date} · 來源：PvPoke／PokeMiners`;
   const mkCnt = { 保留: 0, 可送: 0, 已送: 0 };
   for (const k of Object.keys(marks)) if (mkCnt[marks[k]] !== undefined) mkCnt[marks[k]]++;
   const mkTotal = mkCnt.保留 + mkCnt.可送 + mkCnt.已送;
@@ -222,7 +238,7 @@ function openDetail(f) {
   const tags = f.tags || [];
   const tagNames = { legendary: '傳說', wildlegendary: '野外傳說', mythical: '幻獸', ultrabeast: '異獸', regional: '區域限定', mega: '超級進化', supermega: '超級進化(X/Y)', shadow: '已暗影', shadoweligible: '物種有暗影版（火箭隊獲取，一般個體不可轉換）', alolan: '阿羅拉', galarian: '伽勒爾', hisuian: '洗翠', paldean: '帕底亞', starter: '御三家', duplicate: '重複型態' };
   if (f.dmg) tagNames.dmg = '超極巨化'; else if (f.dm) tagNames.dm = '極巨化';
-  const rankChips = [500, 1500, 2500, 10000].map(L => f.pvp[L] ? `<span class="rankchip">${LEAGUE_NAME[L]} <b>#${f.pvp[L].r}</b></span>` : '').join('');
+  const rankChips = [500, 1500, 2500, 10000].map(L => f.pvp[L] ? `<span class="rankchip" title="PvPoke 評分 ${f.pvp[L].rating ?? '—'}（愈高愈強，衡量門檻寬窄）">${LEAGUE_NAME[L]} <b>#${f.pvp[L].r}</b>${f.pvp[L].rating != null ? ' · ' + f.pvp[L].rating : ''}</span>` : '').join('');
   const cupChips = (f.cupR || []).map(c => {
     const cd = (DATA.cups || [])[c[0]];
     return cd ? `<span class="rankchip cupchip" title="${cd.zh}（CP 上限 ${cd.cp}，榜單共 ${cd.total} 型態）／資料 ${DATA.cupFetched} 撈取">${cd.zh} <b>#${c[1]}</b></span>` : '';
@@ -318,7 +334,7 @@ function openDetail(f) {
     '這隻<b>可以送走了</b>：遊戲內「傳送」即可；送前再看一眼標籤，確認沒有你想要收藏的東西。'];
   const nextRows = [];
   if (f.dm || f.dmg) nextRows.push(`· 這隻能打<b>極巨戰</b>：先練到 Lv30 左右就很堪用，不必一次推到 50${f.dmg ? '（超極巨化是獨立個體，別跟普通形態共用）' : ''}。`);
-  if (f.megas) nextRows.push('· 有<b>超級進化</b>形態：超級能量靠同物種進化／傳送累積，留一隻就好，其餘可參考下方超級進化估算。');
+  if (f.megas) nextRows.push('· 有<b>超級進化</b>形態：<b>超級能量</b>主要靠打超級進化戰（Mega 團體戰）、抓「曾超級進化過」的該物種、或帶著超級進化中的夥伴走路累積——<b>傳送只給一般糖果，不給超級能量</b>；留一隻母體即可。');
   if (f.tags && f.tags.includes('shadoweligible') && !tags.includes('shadow')) nextRows.push('· 物種有暗影版（火箭隊抓取）：已暗影若有下方「淨化建議」可參考其取捨。');
   const nextHtml = `<div class="ivref">${nextActs[f.verdict.tier]}${nextRows.length ? '<br>' + nextRows.join('<br>') : ''}</div>`;
 
@@ -345,7 +361,7 @@ function openDetail(f) {
         ${m.pve ? `PvE 估算：循環 DPS ${m.pve.dps}／強度前 ${(100 - m.pve.pct).toFixed(1)}%` : '無招式估算'}
         <br><span style="color:var(--muted);font-size:11px">超級進化型態無法參加聯盟對戰</span></div></div>`).join('')}</div>`) : ''}
 
-    ${fold(false, '對戰排名（PvPoke）', b ? LEAGUE_NAME[b.L] + ' #' + b.r : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
+    ${fold(false, '對戰排名（PvPoke）', b ? (b.r <= 500 ? LEAGUE_NAME[b.L] + ' #' + b.r : '聯盟榜後段') : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
 
     ${fold(false, '限制盃／特殊盃賽排名', (f.cupR && f.cupR.length) ? f.cupR.length + ' 項上榜' : '未上榜', `<div class="ivref" style="margin-bottom:8px">剛入坑可先<b>忽略這區</b>——這些是限定的活動賽制，看上面的普通聯盟名次就夠了。</div><div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div>
       <p class="muted" style="font-size:11px;margin:6px 0 0">榜單隨季度輪替，抓取日 ${DATA.cupFetched || '—'}</p>`)}
@@ -364,7 +380,7 @@ function openDetail(f) {
     ${dmxHtml ? dmxHtml : ''}
 
     ${fold(false, '建議對戰個體值（rank 1 參考）', null, `<div class="ivref" style="margin-bottom:8px"><b>為什麼排名 1 的 IV 常是「攻低」？</b>對戰有 CP 上限：攻擊愈低，同一隻能升到的等級愈高、愈耐打——<b>3/14/12 不是差，是這隻在該聯盟裡最耐打的黃金組合</b>。<br>
-      遊戲內看 IV：打開寶可夢 →「查看／評價」→ 三條弧線對應攻／防／血。</div><div class="ivlines">${ivRefs}</div>
+      遊戲內看 IV：打開寶可夢 →「查看／評價」→ 三條評價條（滑桿樣式）＋上方星級，對應攻／防／血。</div><div class="ivlines">${ivRefs}</div>
       <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div>`)}
 
     ${fold(false, 'IV 排名計算機', null,
@@ -373,7 +389,7 @@ function openDetail(f) {
         <label class="ivfield"><span>攻擊</span><input id="ivA" type="number" min="0" max="15" value="15" aria-label="攻擊個體值 0 到 15"></label>
         <label class="ivfield"><span>防禦</span><input id="ivD" type="number" min="0" max="15" value="15" aria-label="防禦個體值 0 到 15"></label>
         <label class="ivfield"><span>血量（耐力）</span><input id="ivH" type="number" min="0" max="15" value="15" aria-label="耐力（血量）個體值 0 到 15"></label>
-        <label class="ivfield ivleague"><span>聯盟上限</span><select id="ivLeague" aria-label="聯盟上限">${[500, 1500, 2500, 10000].map(L => `<option value="${L}" ${L == 1500 ? 'selected' : ''}>${LEAGUE_NAME[L]}</option>`).join('')}</select></label>
+        <label class="ivfield ivleague"><span>聯盟上限</span><select id="ivLeague" aria-label="聯盟上限">${[500, 1500, 2500, 10000].map(L => `<option value="${L}" ${L == 1500 ? 'selected' : ''}>${LEAGUE_NAME[L]}</option>`).join('')}${[...new Set(((DATA && DATA.cups) || []).map(c => c.cp))].filter(cp => ![500, 1500, 2500, 10000].includes(cp)).sort((x, y) => x - y).map(cp => `<option value="${cp}">${capName(cp)}（特殊盃）</option>`).join('')}</select></label>
       </div>
       <button id="ivGo">計算排名</button>
       <div id="ivResult"></div>`)}
@@ -418,7 +434,7 @@ function runIvCalc() {
     const cap = parseInt($('#ivLeague').value, 10);
     if (ivs.some(v => isNaN(v) || v < 0 || v > 15)) { $('#ivResult').textContent = '個體值請輸入 0~15 的數字'; return; }
     const r = ivRank(current, ivs, cap);
-    if (!r) { $('#ivResult').textContent = '此型態無法進入該聯盟'; return; }
+    if (!r) { $('#ivResult').textContent = '此型態無法進入該聯盟／盃賽'; return; }
     // 物種本身在「該聯盟」的地位（IV 再好也救不了整體太弱的物種）
     const sp = current.pvp && current.pvp[cap];
     const spRank = sp ? sp.r : null;
@@ -446,8 +462,8 @@ function runIvCalc() {
     }
     const cupLine = cupCd ? `<br>盃賽情報：在「${cupCd.zh}（CP${cupCd.cp}）」排行第 <b>${cupBest[1]}</b> 名／榜單共 ${cupCd.total} 型態` : '';
     const spLine = spRank != null
-      ? `物種在${LEAGUE_NAME[cap]}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
-      : `物種未進入該聯盟排行榜＋IV 排名是 #${r.rank}/${r.total}`;
+      ? `物種在${capName(cap)}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
+      : `物種未進入${capName(cap)}排行榜＋IV 排名是 #${r.rank}/${r.total}`;
     $('#ivResult').innerHTML = `<span class="grade" style="background:${color};color:#141420">${grade}</span><br>
       ${spLine}${cupLine}<br>
       最佳等級 Lv${r.level}、CP ${r.cp}
@@ -467,14 +483,15 @@ $('#search').addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     filtr.search = e.target.value.trim();
+    saveFiltr();
     render();
   }, 150);
 });
-$('#filterTier').addEventListener('change', e => { filtr.tier = e.target.value; render(); });
-$('#filterType').addEventListener('change', e => { filtr.type = e.target.value; render(); });
-$('#filterExtra').addEventListener('change', e => { filtr.extra = e.target.value; render(); });
-$('#filterGen').addEventListener('change', e => { filtr.gen = e.target.value; render(); });
-$('#sortBy').addEventListener('change', e => { filtr.sort = e.target.value; render(); });
+$('#filterTier').addEventListener('change', e => { filtr.tier = e.target.value; saveFiltr(); render(); });
+$('#filterType').addEventListener('change', e => { filtr.type = e.target.value; saveFiltr(); render(); });
+$('#filterExtra').addEventListener('change', e => { filtr.extra = e.target.value; saveFiltr(); render(); });
+$('#filterGen').addEventListener('change', e => { filtr.gen = e.target.value; saveFiltr(); render(); });
+$('#sortBy').addEventListener('change', e => { filtr.sort = e.target.value; saveFiltr(); render(); });
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
 {
   const btn = $('#imgStyle');
@@ -515,7 +532,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=14').then(r => {
+fetch('data/data.json?v=15').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
