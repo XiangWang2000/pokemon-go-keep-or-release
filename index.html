@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>寶可夢GO 去留指南</title>
+<link rel="stylesheet" href="css/style.css?v=5">
+</head>
+<body>
+<header>
+  <h1><svg class="mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#ffcc00" stroke-width="2"/><line x1="3" y1="12" x2="21" y2="12" stroke="#ffcc00" stroke-width="2"/><circle cx="12" cy="12" r="3.5" fill="none" stroke="#ffcc00" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="#ffcc00"/></svg>寶可夢GO 去留指南 <span class="sub">Keep or Transfer</span></h1>
+  <div class="controls">
+    <button id="imgStyle" aria-label="切換圖示來源" title="GO 原圖＝遊戲內畫風（自然、載入快）；HOME 高清＝Pokémon HOME 512 渲染（清晰、畫風稍異）">圖示：GO 原圖</button>
+    <input id="search" type="search" placeholder="搜尋：中文名 / 英文名 / 編號…" aria-label="搜尋寶可夢" autocomplete="off">
+    <select id="filterTier" aria-label="篩選：評級">
+      <option value="">全部評級</option>
+      <option value="0">必留</option>
+      <option value="1">建議保留</option>
+      <option value="2">看情況</option>
+      <option value="3">可傳送</option>
+    </select>
+    <select id="filterType" aria-label="篩選：屬性">
+      <option value="">全部屬性</option>
+    </select>
+    <select id="filterExtra" aria-label="篩選：類別">
+      <option value="">全部類別</option>
+      <option value="legend">傳說／幻獸</option>
+      <option value="mega">超級進化</option>
+      <option value="dmax">極巨化</option>
+      <option value="gmax">超極巨化</option>
+      <option value="shadow">暗影／可暗影化</option>
+      <option value="regional">區域限定</option>
+      <option value="nfe">未完全進化</option>
+      <option value="iv">有 IV 參考（對戰用）</option>
+      <option value="mine">我的收藏</option>
+    </select>
+    <select id="sortBy" aria-label="排序方式">
+      <option value="dex">排序：圖鑑</option>
+      <option value="cp">排序：最高 CP</option>
+      <option value="pvp">排序：最佳 PvP 排名</option>
+      <option value="pve">排序：PvE 強度</option>
+      <option value="tier">排序：評級</option>
+    </select>
+  </div>
+  <div id="resultCount" aria-live="polite"></div>
+</header>
+<main><div id="grid"></div></main>
+
+<aside id="detail" class="hidden" role="dialog" aria-modal="false" aria-label="型態詳細資訊">
+  <button id="closeDetail" aria-label="關閉詳細資訊">✕</button>
+  <div id="detailBody"></div>
+</aside>
+<div id="toast" role="status"></div>
+<script src="js/app.js?v=8"></script>
+</body>
+</html>
