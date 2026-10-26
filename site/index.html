@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>寶可夢GO 去留指南</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=13">
+<link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
 <header>
@@ -56,6 +56,21 @@
     </select>
   </div>
   <div id="resultCount" aria-live="polite"></div>
+  <details id="guide">
+    <summary>📖 新手指南：盒子滿了怎麼辦？／名詞小抄</summary>
+    <div class="guidebody">
+      <ol>
+        <li><b>篩「評級＝可傳送」</b>：這些通常可以直接送，送前逐卡掃一眼標籤。</li>
+        <li><b>不確定的點開卡片</b>：看「判定理由」和「接下來該做什麼」；暗影個體有現成的「淨化建議」。</li>
+        <li><b>標記</b>：詳細頁底按「標記這隻」會在 保留／可送／已送 間循環——卡片與清單列都會顯示標記，最後照「可送」一次處理。</li>
+      </ol>
+      <p><b>卡片右上角徽章</b>：<b>極</b>＝可參加極巨戰、<b>G·巨</b>＝可參加超極巨化戰、<b>超</b>＝有超級進化形態；頭像有紫光＝暗影。
+      <br><b>卡片下方小字</b>：<code>CP · 聯盟名次 · PvE 前 X% · Max 前 X%</code>（有才顯示）——<code>#</code> 是名次、<b>愈小愈強</b>；<code>前 X%</code> 是強度排名、<b>數字愈小愈強</b>。</p>
+      <p><b>同一隻寶可夢可能有好幾張卡</b>——本體、暗影、超級進化、極巨化…各有獨立評級，要分別看。</p>
+      <p><b>名詞小抄：</b>PvP＝玩家對戰（聯盟）；PvE＝打道館／團體戰；DPS＝每秒輸出傷害；IV／個體值＝天生素質（攻／防／血各 0–15，後天改不了、淨化可 +2）；STAB／屬性一致＝招式屬性與自身相同時傷害 ×1.2；meta＝現行環境的主流強度；PvPoke＝知名對戰排行網站（本站榜單來源）；淨百＝淨化後剛好 15/15/15。</p>
+      <p id="dataDate" style="color:var(--muted);font-size:11px;margin:0"></p>
+    </div>
+  </details>
 </header>
 <main><div id="grid"></div></main>
 
@@ -64,6 +79,6 @@
   <div id="detailBody"></div>
 </aside>
 <div id="toast" role="status"></div>
-<script src="js/app.js?v=13"></script>
+<script src="js/app.js?v=14"></script>
 </body>
 </html>
