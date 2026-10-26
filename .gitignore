@@ -1,0 +1,10 @@
+node_modules/
+
+# 本機輸出／暫存，不入 repo
+audit_out.txt
+audit_fail.txt
+build_sel.txt
+pvpoke_rankings_page.html
+
+# 內部檢討筆記，不上公開 repo
+PROJECT_RETROSPECTIVE_2026-10-25.md

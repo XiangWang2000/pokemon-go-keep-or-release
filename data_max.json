@@ -1,0 +1,920 @@
+{
+ "venusaur": {
+  "dm": true,
+  "dmg": true,
+  "name": "Venusaur",
+  "species": "venusaur"
+ },
+ "charizard": {
+  "dm": true,
+  "dmg": true,
+  "name": "Charizard",
+  "species": "charizard"
+ },
+ "blastoise": {
+  "dm": true,
+  "dmg": true,
+  "name": "Blastoise",
+  "species": "blastoise"
+ },
+ "butterfree": {
+  "dm": true,
+  "dmg": true,
+  "name": "Butterfree",
+  "species": "butterfree"
+ },
+ "pikachu": {
+  "dm": true,
+  "dmg": true,
+  "name": "Pikachu",
+  "species": "pikachu"
+ },
+ "meowth": {
+  "dm": true,
+  "dmg": true,
+  "name": "Meowth",
+  "species": "meowth"
+ },
+ "machamp": {
+  "dm": true,
+  "dmg": true,
+  "name": "Machamp",
+  "species": "machamp"
+ },
+ "gengar": {
+  "dm": true,
+  "dmg": true,
+  "name": "Gengar",
+  "species": "gengar"
+ },
+ "kingler": {
+  "dm": true,
+  "dmg": true,
+  "name": "Kingler",
+  "species": "kingler"
+ },
+ "lapras": {
+  "dm": true,
+  "dmg": true,
+  "name": "Lapras",
+  "species": "lapras"
+ },
+ "snorlax": {
+  "dm": true,
+  "dmg": true,
+  "name": "Snorlax",
+  "species": "snorlax"
+ },
+ "garbodor": {
+  "dm": true,
+  "dmg": true,
+  "name": "Garbodor",
+  "species": "garbodor"
+ },
+ "rillaboom": {
+  "dm": true,
+  "dmg": true,
+  "name": "Rillaboom",
+  "species": "rillaboom"
+ },
+ "cinderace": {
+  "dm": true,
+  "dmg": true,
+  "name": "Cinderace",
+  "species": "cinderace"
+ },
+ "inteleon": {
+  "dm": true,
+  "dmg": true,
+  "name": "Inteleon",
+  "species": "inteleon"
+ },
+ "toxtricity_low_key": {
+  "dm": true,
+  "dmg": true,
+  "name": "Toxtricity",
+  "species": "toxtricity_low_key"
+ },
+ "grimmsnarl": {
+  "dm": true,
+  "dmg": true,
+  "name": "Grimmsnarl",
+  "species": "grimmsnarl"
+ },
+ "toxtricity_amped": {
+  "dm": true,
+  "dmg": true,
+  "name": "Toxtricity",
+  "species": "toxtricity_amped"
+ },
+ "bulbasaur": {
+  "dm": true,
+  "dmg": false,
+  "name": "Bulbasaur",
+  "species": "bulbasaur"
+ },
+ "ivysaur": {
+  "dm": true,
+  "dmg": false,
+  "name": "Ivysaur",
+  "species": "ivysaur"
+ },
+ "charmander": {
+  "dm": true,
+  "dmg": false,
+  "name": "Charmander",
+  "species": "charmander"
+ },
+ "charmeleon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Charmeleon",
+  "species": "charmeleon"
+ },
+ "squirtle": {
+  "dm": true,
+  "dmg": false,
+  "name": "Squirtle",
+  "species": "squirtle"
+ },
+ "wartortle": {
+  "dm": true,
+  "dmg": false,
+  "name": "Wartortle",
+  "species": "wartortle"
+ },
+ "caterpie": {
+  "dm": true,
+  "dmg": false,
+  "name": "Caterpie",
+  "species": "caterpie"
+ },
+ "metapod": {
+  "dm": true,
+  "dmg": false,
+  "name": "Metapod",
+  "species": "metapod"
+ },
+ "raichu": {
+  "dm": true,
+  "dmg": false,
+  "name": "Raichu",
+  "species": "raichu"
+ },
+ "growlithe": {
+  "dm": true,
+  "dmg": false,
+  "name": "Growlithe",
+  "species": "growlithe"
+ },
+ "arcanine": {
+  "dm": true,
+  "dmg": false,
+  "name": "Arcanine",
+  "species": "arcanine"
+ },
+ "abra": {
+  "dm": true,
+  "dmg": false,
+  "name": "Abra",
+  "species": "abra"
+ },
+ "kadabra": {
+  "dm": true,
+  "dmg": false,
+  "name": "Kadabra",
+  "species": "kadabra"
+ },
+ "alakazam": {
+  "dm": true,
+  "dmg": false,
+  "name": "Alakazam",
+  "species": "alakazam"
+ },
+ "machop": {
+  "dm": true,
+  "dmg": false,
+  "name": "Machop",
+  "species": "machop"
+ },
+ "machoke": {
+  "dm": true,
+  "dmg": false,
+  "name": "Machoke",
+  "species": "machoke"
+ },
+ "gastly": {
+  "dm": true,
+  "dmg": false,
+  "name": "Gastly",
+  "species": "gastly"
+ },
+ "haunter": {
+  "dm": true,
+  "dmg": false,
+  "name": "Haunter",
+  "species": "haunter"
+ },
+ "krabby": {
+  "dm": true,
+  "dmg": false,
+  "name": "Krabby",
+  "species": "krabby"
+ },
+ "hitmonlee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hitmonlee",
+  "species": "hitmonlee"
+ },
+ "hitmonchan": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hitmonchan",
+  "species": "hitmonchan"
+ },
+ "rhyhorn": {
+  "dm": true,
+  "dmg": false,
+  "name": "Rhyhorn",
+  "species": "rhyhorn"
+ },
+ "rhydon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Rhydon",
+  "species": "rhydon"
+ },
+ "chansey": {
+  "dm": true,
+  "dmg": false,
+  "name": "Chansey",
+  "species": "chansey"
+ },
+ "electabuzz": {
+  "dm": true,
+  "dmg": false,
+  "name": "Electabuzz",
+  "species": "electabuzz"
+ },
+ "magmar": {
+  "dm": true,
+  "dmg": false,
+  "name": "Magmar",
+  "species": "magmar"
+ },
+ "magikarp": {
+  "dm": true,
+  "dmg": false,
+  "name": "Magikarp",
+  "species": "magikarp"
+ },
+ "gyarados": {
+  "dm": true,
+  "dmg": false,
+  "name": "Gyarados",
+  "species": "gyarados"
+ },
+ "eevee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Eevee",
+  "species": "eevee"
+ },
+ "vaporeon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Vaporeon",
+  "species": "vaporeon"
+ },
+ "jolteon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Jolteon",
+  "species": "jolteon"
+ },
+ "flareon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Flareon",
+  "species": "flareon"
+ },
+ "omanyte": {
+  "dm": true,
+  "dmg": false,
+  "name": "Omanyte",
+  "species": "omanyte"
+ },
+ "omastar": {
+  "dm": true,
+  "dmg": false,
+  "name": "Omastar",
+  "species": "omastar"
+ },
+ "kabuto": {
+  "dm": true,
+  "dmg": false,
+  "name": "Kabuto",
+  "species": "kabuto"
+ },
+ "kabutops": {
+  "dm": true,
+  "dmg": false,
+  "name": "Kabutops",
+  "species": "kabutops"
+ },
+ "articuno": {
+  "dm": true,
+  "dmg": false,
+  "name": "Articuno",
+  "species": "articuno"
+ },
+ "zapdos": {
+  "dm": true,
+  "dmg": false,
+  "name": "Zapdos",
+  "species": "zapdos"
+ },
+ "moltres": {
+  "dm": true,
+  "dmg": false,
+  "name": "Moltres",
+  "species": "moltres"
+ },
+ "espeon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Espeon",
+  "species": "espeon"
+ },
+ "umbreon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Umbreon",
+  "species": "umbreon"
+ },
+ "shuckle": {
+  "dm": true,
+  "dmg": false,
+  "name": "Shuckle",
+  "species": "shuckle"
+ },
+ "sneasel": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sneasel",
+  "species": "sneasel"
+ },
+ "blissey": {
+  "dm": true,
+  "dmg": false,
+  "name": "Blissey",
+  "species": "blissey"
+ },
+ "raikou": {
+  "dm": true,
+  "dmg": false,
+  "name": "Raikou",
+  "species": "raikou"
+ },
+ "entei": {
+  "dm": true,
+  "dmg": false,
+  "name": "Entei",
+  "species": "entei"
+ },
+ "suicune": {
+  "dm": true,
+  "dmg": false,
+  "name": "Suicune",
+  "species": "suicune"
+ },
+ "lugia": {
+  "dm": true,
+  "dmg": false,
+  "name": "Lugia",
+  "species": "lugia"
+ },
+ "ho_oh": {
+  "dm": true,
+  "dmg": false,
+  "name": "Ho-Oh",
+  "species": "ho_oh"
+ },
+ "ralts": {
+  "dm": true,
+  "dmg": false,
+  "name": "Ralts",
+  "species": "ralts"
+ },
+ "kirlia": {
+  "dm": true,
+  "dmg": false,
+  "name": "Kirlia",
+  "species": "kirlia"
+ },
+ "gardevoir": {
+  "dm": true,
+  "dmg": false,
+  "name": "Gardevoir",
+  "species": "gardevoir"
+ },
+ "sableye": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sableye",
+  "species": "sableye"
+ },
+ "wailmer": {
+  "dm": true,
+  "dmg": false,
+  "name": "Wailmer",
+  "species": "wailmer"
+ },
+ "wailord": {
+  "dm": true,
+  "dmg": false,
+  "name": "Wailord",
+  "species": "wailord"
+ },
+ "trapinch": {
+  "dm": true,
+  "dmg": false,
+  "name": "Trapinch",
+  "species": "trapinch"
+ },
+ "vibrava": {
+  "dm": true,
+  "dmg": false,
+  "name": "Vibrava",
+  "species": "vibrava"
+ },
+ "flygon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Flygon",
+  "species": "flygon"
+ },
+ "feebas": {
+  "dm": true,
+  "dmg": false,
+  "name": "Feebas",
+  "species": "feebas"
+ },
+ "milotic": {
+  "dm": true,
+  "dmg": false,
+  "name": "Milotic",
+  "species": "milotic"
+ },
+ "spheal": {
+  "dm": true,
+  "dmg": false,
+  "name": "Spheal",
+  "species": "spheal"
+ },
+ "sealeo": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sealeo",
+  "species": "sealeo"
+ },
+ "walrein": {
+  "dm": true,
+  "dmg": false,
+  "name": "Walrein",
+  "species": "walrein"
+ },
+ "beldum": {
+  "dm": true,
+  "dmg": false,
+  "name": "Beldum",
+  "species": "beldum"
+ },
+ "metang": {
+  "dm": true,
+  "dmg": false,
+  "name": "Metang",
+  "species": "metang"
+ },
+ "metagross": {
+  "dm": true,
+  "dmg": false,
+  "name": "Metagross",
+  "species": "metagross"
+ },
+ "regirock": {
+  "dm": true,
+  "dmg": false,
+  "name": "Regirock",
+  "species": "regirock"
+ },
+ "regice": {
+  "dm": true,
+  "dmg": false,
+  "name": "Regice",
+  "species": "regice"
+ },
+ "registeel": {
+  "dm": true,
+  "dmg": false,
+  "name": "Registeel",
+  "species": "registeel"
+ },
+ "latias": {
+  "dm": true,
+  "dmg": false,
+  "name": "Latias",
+  "species": "latias"
+ },
+ "latios": {
+  "dm": true,
+  "dmg": false,
+  "name": "Latios",
+  "species": "latios"
+ },
+ "combee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Combee",
+  "species": "combee"
+ },
+ "vespiquen": {
+  "dm": true,
+  "dmg": false,
+  "name": "Vespiquen",
+  "species": "vespiquen"
+ },
+ "weavile": {
+  "dm": true,
+  "dmg": false,
+  "name": "Weavile",
+  "species": "weavile"
+ },
+ "rhyperior": {
+  "dm": true,
+  "dmg": false,
+  "name": "Rhyperior",
+  "species": "rhyperior"
+ },
+ "electivire": {
+  "dm": true,
+  "dmg": false,
+  "name": "Electivire",
+  "species": "electivire"
+ },
+ "magmortar": {
+  "dm": true,
+  "dmg": false,
+  "name": "Magmortar",
+  "species": "magmortar"
+ },
+ "leafeon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Leafeon",
+  "species": "leafeon"
+ },
+ "glaceon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Glaceon",
+  "species": "glaceon"
+ },
+ "gallade": {
+  "dm": true,
+  "dmg": false,
+  "name": "Gallade",
+  "species": "gallade"
+ },
+ "uxie": {
+  "dm": true,
+  "dmg": false,
+  "name": "Uxie",
+  "species": "uxie"
+ },
+ "mesprit": {
+  "dm": true,
+  "dmg": false,
+  "name": "Mesprit",
+  "species": "mesprit"
+ },
+ "azelf": {
+  "dm": true,
+  "dmg": false,
+  "name": "Azelf",
+  "species": "azelf"
+ },
+ "dialga": {
+  "dm": true,
+  "dmg": false,
+  "name": "Dialga",
+  "species": "dialga"
+ },
+ "palkia": {
+  "dm": true,
+  "dmg": false,
+  "name": "Palkia",
+  "species": "palkia"
+ },
+ "pidove": {
+  "dm": true,
+  "dmg": false,
+  "name": "Pidove",
+  "species": "pidove"
+ },
+ "tranquill": {
+  "dm": true,
+  "dmg": false,
+  "name": "Tranquill",
+  "species": "tranquill"
+ },
+ "unfezant": {
+  "dm": true,
+  "dmg": false,
+  "name": "Unfezant",
+  "species": "unfezant"
+ },
+ "roggenrola": {
+  "dm": true,
+  "dmg": false,
+  "name": "Roggenrola",
+  "species": "roggenrola"
+ },
+ "boldore": {
+  "dm": true,
+  "dmg": false,
+  "name": "Boldore",
+  "species": "boldore"
+ },
+ "gigalith": {
+  "dm": true,
+  "dmg": false,
+  "name": "Gigalith",
+  "species": "gigalith"
+ },
+ "drilbur": {
+  "dm": true,
+  "dmg": false,
+  "name": "Drilbur",
+  "species": "drilbur"
+ },
+ "excadrill": {
+  "dm": true,
+  "dmg": false,
+  "name": "Excadrill",
+  "species": "excadrill"
+ },
+ "cottonee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Cottonee",
+  "species": "cottonee"
+ },
+ "whimsicott": {
+  "dm": true,
+  "dmg": false,
+  "name": "Whimsicott",
+  "species": "whimsicott"
+ },
+ "darumaka": {
+  "dm": true,
+  "dmg": false,
+  "name": "Darumaka",
+  "species": "darumaka"
+ },
+ "darmanitan_standard": {
+  "dm": true,
+  "dmg": false,
+  "name": "Darmanitan",
+  "species": "darmanitan_standard"
+ },
+ "trubbish": {
+  "dm": true,
+  "dmg": false,
+  "name": "Trubbish",
+  "species": "trubbish"
+ },
+ "cryogonal": {
+  "dm": true,
+  "dmg": false,
+  "name": "Cryogonal",
+  "species": "cryogonal"
+ },
+ "deino": {
+  "dm": true,
+  "dmg": false,
+  "name": "Deino",
+  "species": "deino"
+ },
+ "zweilous": {
+  "dm": true,
+  "dmg": false,
+  "name": "Zweilous",
+  "species": "zweilous"
+ },
+ "hydreigon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hydreigon",
+  "species": "hydreigon"
+ },
+ "inkay": {
+  "dm": true,
+  "dmg": false,
+  "name": "Inkay",
+  "species": "inkay"
+ },
+ "malamar": {
+  "dm": true,
+  "dmg": false,
+  "name": "Malamar",
+  "species": "malamar"
+ },
+ "sylveon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sylveon",
+  "species": "sylveon"
+ },
+ "bounsweet": {
+  "dm": true,
+  "dmg": false,
+  "name": "Bounsweet",
+  "species": "bounsweet"
+ },
+ "steenee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Steenee",
+  "species": "steenee"
+ },
+ "tsareena": {
+  "dm": true,
+  "dmg": false,
+  "name": "Tsareena",
+  "species": "tsareena"
+ },
+ "passimian": {
+  "dm": true,
+  "dmg": false,
+  "name": "Passimian",
+  "species": "passimian"
+ },
+ "drampa": {
+  "dm": true,
+  "dmg": false,
+  "name": "Drampa",
+  "species": "drampa"
+ },
+ "grookey": {
+  "dm": true,
+  "dmg": false,
+  "name": "Grookey",
+  "species": "grookey"
+ },
+ "thwackey": {
+  "dm": true,
+  "dmg": false,
+  "name": "Thwackey",
+  "species": "thwackey"
+ },
+ "scorbunny": {
+  "dm": true,
+  "dmg": false,
+  "name": "Scorbunny",
+  "species": "scorbunny"
+ },
+ "raboot": {
+  "dm": true,
+  "dmg": false,
+  "name": "Raboot",
+  "species": "raboot"
+ },
+ "sobble": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sobble",
+  "species": "sobble"
+ },
+ "drizzile": {
+  "dm": true,
+  "dmg": false,
+  "name": "Drizzile",
+  "species": "drizzile"
+ },
+ "skwovet": {
+  "dm": true,
+  "dmg": false,
+  "name": "Skwovet",
+  "species": "skwovet"
+ },
+ "greedent": {
+  "dm": true,
+  "dmg": false,
+  "name": "Greedent",
+  "species": "greedent"
+ },
+ "rookidee": {
+  "dm": true,
+  "dmg": false,
+  "name": "Rookidee",
+  "species": "rookidee"
+ },
+ "corvisquire": {
+  "dm": true,
+  "dmg": false,
+  "name": "Corvisquire",
+  "species": "corvisquire"
+ },
+ "corviknight": {
+  "dm": true,
+  "dmg": false,
+  "name": "Corviknight",
+  "species": "corviknight"
+ },
+ "wooloo": {
+  "dm": true,
+  "dmg": false,
+  "name": "Wooloo",
+  "species": "wooloo"
+ },
+ "dubwool": {
+  "dm": true,
+  "dmg": false,
+  "name": "Dubwool",
+  "species": "dubwool"
+ },
+ "sizzlipede": {
+  "dm": true,
+  "dmg": false,
+  "name": "Sizzlipede",
+  "species": "sizzlipede"
+ },
+ "centiskorch": {
+  "dm": true,
+  "dmg": false,
+  "name": "Centiskorch",
+  "species": "centiskorch"
+ },
+ "hatenna": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hatenna",
+  "species": "hatenna"
+ },
+ "hattrem": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hattrem",
+  "species": "hattrem"
+ },
+ "hatterene": {
+  "dm": true,
+  "dmg": false,
+  "name": "Hatterene",
+  "species": "hatterene"
+ },
+ "falinks": {
+  "dm": true,
+  "dmg": false,
+  "name": "Falinks",
+  "species": "falinks"
+ },
+ "duraludon": {
+  "dm": true,
+  "dmg": false,
+  "name": "Duraludon",
+  "species": "duraludon"
+ },
+ "zacian_crowned_sword": {
+  "dm": true,
+  "dmg": false,
+  "name": "Zacian",
+  "species": "zacian_crowned_sword"
+ },
+ "zamazenta_crowned_shield": {
+  "dm": true,
+  "dmg": false,
+  "name": "Zamazenta",
+  "species": "zamazenta_crowned_shield"
+ },
+ "kubfu": {
+  "dm": true,
+  "dmg": false,
+  "name": "Kubfu",
+  "species": "kubfu"
+ },
+ "urshifu_single_strike": {
+  "dm": true,
+  "dmg": false,
+  "name": "Urshifu",
+  "species": "urshifu_single_strike"
+ },
+ "urshifu_rapid_strike": {
+  "dm": true,
+  "dmg": false,
+  "name": "Urshifu",
+  "species": "urshifu_rapid_strike"
+ }
+}
