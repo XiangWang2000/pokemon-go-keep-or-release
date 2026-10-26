@@ -445,8 +445,9 @@ for (const p of gm.pokemon) {
     evoNext: fam.evolutions && fam.evolutions.length ? [...new Set(fam.evolutions)] : undefined,
   };
   // 極巨化/超極巨化（data/max.json 由 pokemondb 極巨化清單解析而來）
+  const MAX_EXTRA = new Set(['melmetal']); // 美錄梅塔經 Max Battle 特殊調查取得，pokemondb 清單漏列 → 補標極巨化
   if (maxData) {
-    const mx = maxData[p.speciesId];
+    const mx = maxData[p.speciesId] || (MAX_EXTRA.has(p.speciesId) ? {} : null);
     if (mx) { entry.dm = true; entry.dmx = dmxCalc(p); if (mx.dmg) entry.dmg = true; }
   }
   all.push(entry);
@@ -658,13 +659,21 @@ function judge(e) {
     // 此時「頂尖攻打手（必留）」比名次說明更有參考價值（gigalith_shadow 案例）
     tier = 1;
     reasons.push('已暗影：' + LEAGUE_ZH[b.L] + '排行第 ' + b.r + ' 名，暗影版本主流');
-  } else if ((tags.includes('legendary') || tags.includes('wildlegendary'))) {
-    tier = 1;
-    reasons.push('傳說寶可夢：至少保留一隻；重複低 IV 可送或交換');
-    rankReason(10000, 100) || rankReason(2500, 100);
-  } else if (tags.includes('ultrabeast')) {
-    tier = 1;
-    reasons.push('異獸：出現稀有，建議各留一隻');
+  } else if (tags.includes('legendary') || tags.includes('wildlegendary') || tags.includes('ultrabeast')) {
+    // 傳說／異獸的「稀有收藏」模板之前，先讓路給硬戰力事實：
+    // 暗影超夢等頂尖攻打手（PvE 前 3%）若只給「至少保留一隻」，會蓋掉它的實際價值
+    if (e.pve && e.pve.pct >= 97) {
+      const kind = tags.includes('ultrabeast') ? '異獸' : '傳說寶可夢';
+      tier = 0;
+      reasons.push(`頂尖攻打手（PvE 估算前 3%）：${kind}中的戰力首選，值得投資等級與糖果`);
+    } else if (tags.includes('ultrabeast')) {
+      tier = 1;
+      reasons.push('異獸：出現稀有，建議各留一隻');
+    } else {
+      tier = 1;
+      reasons.push('傳說寶可夢：至少保留一隻；重複低 IV 可送或交換');
+      rankReason(10000, 100) || rankReason(2500, 100);
+    }
   } else {
     // 一般型態
     const cupHit = e.cupR && e.cupR[0] && e.cupR[0][1] <= 50;
@@ -823,16 +832,16 @@ for (const e of all) {
 }
 
 // ---------- 小小盃次級註記 ----------
-// 判定改以主力聯盟（超級／高級／大師）為主之後，小小盃（500 CP 活動賽制）名次
-// 降級為附加資訊：tier1/2 的行若小小盃 ≤50 名，附一條註記（特殊賽制強，不當主依據）
+// 判定以主力聯盟為主之後，小小盃（500 CP 活動賽制）名次降為附加資訊；
+// 來源統一用 cupR 的 little_500 現行盃規榜（與限制盃晶片同源，避免兩個不同榜單的數字打架）
 for (const e of all) {
-  const lc = e.pvp[500] && e.pvp[500].r;
-  if (!lc || lc > 50) continue;
+  const lc = (e.cupR || []).find(c => cupMeta[c[0]] && cupMeta[c[0]].k === 'little_500');
+  if (!lc || lc[1] > 50) continue;
   const t = e.verdict.tier;
   if (t === 0 || t === 3) continue;
   const why = e.verdict.why || [];
   if (why.some(w => w && w.includes('小小盃'))) continue;
-  why.push(`另為小小盃（500 CP 活動賽制）排行第 ${lc} 名——特殊賽制下的頂尖人選，一般聯盟對戰可忽略`);
+  why.push(`另為小小盃（500 CP 活動賽制）排行第 ${lc[1]} 名——特殊賽制下的頂尖人選，一般聯盟對戰可忽略`);
 }
 for (const e of all) e.verdict.tierName = TIER_NAME[e.verdict.tier];
 
