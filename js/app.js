@@ -56,11 +56,15 @@ function spriteOf(f) {
 }
 
 function bestRank(f) {
+  // 優先超級／高級／大師聯盟（一般人會打的）；小小盃（500 CP 活動賽制）
+  // 只在主力聯盟都沒名次時才當代表——避免「小小盃 #73」搶走頭條誤導新手
+  // （妙蛙種子：小小盃 #73 但超級聯盟 #1072）
   let best = null;
-  for (const L of [500, 1500, 2500, 10000]) {
+  for (const L of [1500, 2500, 10000]) {
     const e = f.pvp[L];
     if (e && (!best || e.r < best.r)) best = { r: e.r, L };
   }
+  if (!best && f.pvp[500]) best = { r: f.pvp[500].r, L: 500 };
   return best;
 }
 
@@ -150,7 +154,7 @@ function cardHtml(f) {
   ].filter(Boolean).join(' · ');
   const isSh = f.id.endsWith('_shadow');
   return `<div class="card" data-id="${f.id}" tabindex="0" role="button" aria-label="${f.zh}，${f.verdict.tierName}">
-    <img loading="lazy" decoding="async" src="${spriteOf(f)}" alt=""${isSh ? ' class="shadowicon"' : ''}>${f.dmg ? '<span class="dmbadge gmax">G·巨</span>' : f.dm ? '<span class="dmbadge">極</span>' : f.megas ? '<span class="dmbadge megab">超</span>' : ''}
+    <img loading="lazy" decoding="async" src="${spriteOf(f)}" alt=""${isSh ? ' class="shadowicon"' : ''}>${f.dmg ? '<span class="dmbadge gmax" title="可參加超極巨化戰（Gigantamax）">G·巨</span>' : f.dm ? '<span class="dmbadge" title="可參加極巨戰（Max Battle）">極</span>' : f.megas ? '<span class="dmbadge megab" title="這個物種有超級進化形態">超</span>' : ''}${marks[f.id] ? `<span class="markchip m-${({ '保留': 'keep', '可送': 'maybe', '已送': 'sent' })[marks[f.id]]}" title="我的標記：${marks[f.id]}">${marks[f.id]}</span>` : ''}
     <div class="zh">${f.zh}</div>
     <div class="en">${f.en}</div>
     <div class="row">${f.t.map(typeBadge).join('')}</div>
@@ -201,7 +205,14 @@ function render() {
   } else {
     grid.innerHTML = list.map(cardHtml).join('');
   }
-  $('#resultCount').textContent = `共 ${list.length} 個型態（資料庫共 ${FORMS.length} 個）`;
+  // 計數行：標明資料更新日（新手需要知道資料新不新）；有標記就附統計，清包時一眼看清
+  let cntLine = `共 ${list.length} 個型態（資料庫共 ${FORMS.length} 個）`;
+  if (DATA.meta && DATA.meta.date) cntLine += ` · 資料更新 ${DATA.meta.date}`;
+  const mkCnt = { 保留: 0, 可送: 0, 已送: 0 };
+  for (const k of Object.keys(marks)) if (mkCnt[marks[k]] !== undefined) mkCnt[marks[k]]++;
+  const mkTotal = mkCnt.保留 + mkCnt.可送 + mkCnt.已送;
+  if (mkTotal) cntLine += ` · 我的標記：${mkTotal} 隻（保留 ${mkCnt.保留}／可送 ${mkCnt.可送}／已送 ${mkCnt.已送}）`;
+  $('#resultCount').textContent = cntLine;
 }
 
 /* ---------- 詳細面板 ---------- */
@@ -300,17 +311,30 @@ function openDetail(f) {
       ${f.dmg ? '· 超極巨化個體攻擊槽是專屬超極巨招式，目標類型有差但威力同屬 250 尺度，估算一併適用。' : ''}</div></div></details>`;
   }
 
-  // 折疊容器：核心決策區（判定理由＋淨化建議＋招式）預設展開，其餘數值細節預設收合；
+  // 「接下來該做什麼」：評級之外補動作指引（新手最想要、卻最缺的一塊）
+  const nextActs = ['這隻是<b>核心戰力</b>：不傳送；有星塵／糖果就照下方「推薦帶法」強化。',
+    '值得用：<b>留著</b>，但可以不急著練——確定要打出場再投資星塵（強化很貴）。',
+    '可留可送：有收藏價值、或還在猶豫就先留；確定不需要再送，不必為它投入資源。',
+    '這隻<b>可以送走了</b>：遊戲內「傳送」即可；送前再看一眼標籤，確認沒有你想要收藏的東西。'];
+  const nextRows = [];
+  if (f.dm || f.dmg) nextRows.push(`· 這隻能打<b>極巨戰</b>：先練到 Lv30 左右就很堪用，不必一次推到 50${f.dmg ? '（超極巨化是獨立個體，別跟普通形態共用）' : ''}。`);
+  if (f.megas) nextRows.push('· 有<b>超級進化</b>形態：超級能量靠同物種進化／傳送累積，留一隻就好，其餘可參考下方超級進化估算。');
+  if (f.tags && f.tags.includes('shadoweligible') && !tags.includes('shadow')) nextRows.push('· 物種有暗影版（火箭隊抓取）：已暗影若有下方「淨化建議」可參考其取捨。');
+  const nextHtml = `<div class="ivref">${nextActs[f.verdict.tier]}${nextRows.length ? '<br>' + nextRows.join('<br>') : ''}</div>`;
+
+  // 折疊容器：核心決策區（判定理由＋接下來＋淨化建議＋招式）預設展開，其餘數值細節預設收合；
   // note＝收合時也能看到的行內摘要，讓使用者不必展開就知道裡面有什麼
   const fold = (open, title, note, inner) =>
     `<details class="fold"${open ? ' open' : ''}><summary>${title}${note ? `<span class="fdnote">${note}</span>` : ''}</summary><div class="foldbody">${inner}</div></details>`;
 
   $('#detailBody').innerHTML = `
-    <h2>${f.zh}</h2><div class="en">${f.en} · #${f.dex} · id: ${f.id}</div>
+    <h2>${f.zh}</h2><div class="en">${f.en} · #${f.dex}</div>
     <img class="sprite${f.id.endsWith('_shadow') ? ' shadowicon' : ''}" src="${spriteOf(f)}" alt="${f.zh} 的遊戲內圖示">
     <div class="vchip t${f.verdict.tier}" style="width:100%;display:block">${f.verdict.tierName}</div>
 
     ${fold(true, '判定理由', null, `<ul class="why">${f.verdict.why.map(w => `<li>${w}</li>`).join('')}</ul>`)}
+
+    ${fold(true, '接下來該做什麼', null, nextHtml)}
 
     ${tags.includes('shadow') ? fold(true, '淨化建議', null, purifyHtml) : ''}
 
@@ -323,8 +347,8 @@ function openDetail(f) {
 
     ${fold(false, '對戰排名（PvPoke）', b ? LEAGUE_NAME[b.L] + ' #' + b.r : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
 
-    ${fold(false, '限制盃／特殊盃賽排名', (f.cupR && f.cupR.length) ? f.cupR.length + ' 項上榜' : '未上榜', `<div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div>
-      <p class="muted" style="font-size:11px;margin:6px 0 0">meta 隨季度輪替，抓取日 ${DATA.cupFetched || '—'}</p>`)}
+    ${fold(false, '限制盃／特殊盃賽排名', (f.cupR && f.cupR.length) ? f.cupR.length + ' 項上榜' : '未上榜', `<div class="ivref" style="margin-bottom:8px">剛入坑可先<b>忽略這區</b>——這些是限定的活動賽制，看上面的普通聯盟名次就夠了。</div><div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div>
+      <p class="muted" style="font-size:11px;margin:6px 0 0">榜單隨季度輪替，抓取日 ${DATA.cupFetched || '—'}</p>`)}
 
     ${fold(false, '道館／團體戰輸出估算（PvE）', f.pve ? '強度前 ' + (100 - f.pve.pct).toFixed(1).replace(/\.0$/, '') + '%' : null,
       (f.pve ? `<table class="stats">
@@ -339,11 +363,13 @@ function openDetail(f) {
 
     ${dmxHtml ? dmxHtml : ''}
 
-    ${fold(false, '建議對戰個體值（rank 1 參考）', null, `<div class="ivlines">${ivRefs}</div>
+    ${fold(false, '建議對戰個體值（rank 1 參考）', null, `<div class="ivref" style="margin-bottom:8px"><b>為什麼排名 1 的 IV 常是「攻低」？</b>對戰有 CP 上限：攻擊愈低，同一隻能升到的等級愈高、愈耐打——<b>3/14/12 不是差，是這隻在該聯盟裡最耐打的黃金組合</b>。<br>
+      遊戲內看 IV：打開寶可夢 →「查看／評價」→ 三條弧線對應攻／防／血。</div><div class="ivlines">${ivRefs}</div>
       <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div>`)}
 
     ${fold(false, 'IV 排名計算機', null,
-      `<div class="ivfields">
+      `<div class="ivref" style="margin-bottom:8px">IV＝個體值（每項 0–15、天生固定；淨化是唯一能 +2 的方法）。遊戲內怎麼看：見上一區的說明。</div>
+      <div class="ivfields">
         <label class="ivfield"><span>攻擊</span><input id="ivA" type="number" min="0" max="15" value="15" aria-label="攻擊個體值 0 到 15"></label>
         <label class="ivfield"><span>防禦</span><input id="ivD" type="number" min="0" max="15" value="15" aria-label="防禦個體值 0 到 15"></label>
         <label class="ivfield"><span>血量（耐力）</span><input id="ivH" type="number" min="0" max="15" value="15" aria-label="耐力（血量）個體值 0 到 15"></label>
@@ -353,7 +379,7 @@ function openDetail(f) {
       <div id="ivResult"></div>`)}
 
     ${fold(false, '種族值＆上限', null, `<table class="stats">
-      <tr><td>攻 / 防 / 血（基礎）</td><td>${f.a} / ${f.d} / ${f.h}</td></tr>
+      <tr><td>種族值（天生固定，非個體值）攻/防/血</td><td>${f.a} / ${f.d} / ${f.h}</td></tr>
       <tr><td>最高 CP（Lv50 滿個體）</td><td>${f.cp50}</td></tr>
       ${(f.bulkPct >= 85) ? `<tr><td>守館體質</td><td>有效體質（HP×DEF）排行前 <b>${(100 - f.bulkPct).toFixed(1).replace(/\.0$/, '')}%</b>——能占守道館較久；但守館收益本來就低（金幣有上限／被淘汰就結束），只當參考指標</td></tr>` : ''}
       <tr><td>標籤</td><td>${tags.map(t => tagNames[t] || t).concat(f.dmg ? ['超極巨化'] : f.dm ? ['極巨化'] : []).join('、') || '一般'}</td></tr>
@@ -378,7 +404,7 @@ function openDetail(f) {
     else if (cur === '保留') marks[f.id] = '可送';
     else if (cur === '可送') marks[f.id] = '已送';
     else delete marks[f.id];
-    saveMarks(); openDetail(f);
+    saveMarks(); render(); openDetail(f); // render 讓卡片角章與統計行即時更新
   };
 }
 function closeDetail() {
@@ -489,12 +515,14 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=13').then(r => {
+fetch('data/data.json?v=14').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
   DATA = d; FORMS = d.forms;
   assignSortKeys();
+  const dd = document.getElementById('dataDate');
+  if (dd && DATA.meta && DATA.meta.date) dd.textContent = `資料更新日：${DATA.meta.date}（榜單來源 PvPoke、盃賽榜 ${DATA.cupFetched || '—'} 撈取）`;
   $('#loadingState') && $('#loadingState').remove();
   // 屬性下拉
   const types = [...new Set(FORMS.flatMap(f => f.t))].sort();
