@@ -798,6 +798,17 @@ for (const e of all) {
 }
 
 const TIER_NAME = ['必留', '建議保留', '看情況', '可傳送'];
+
+// ---------- 極巨戰估算的次級說明 ----------
+// tier2/3 被攻手規則升級的行，主理由已經是「Max Battle 強力攻手」；
+// 其他 dm 行（因 PvP／PvE 等理由拿到 tier0/1）同樣適合極巨戰，補上估算資訊當次級理由
+for (const e of all) {
+  if (!e.dm || !e.dmx || e.verdict.tier === 2 || e.verdict.tier === 3) continue;
+  if (e.dmx.pct < DMX_ATTACKER_PCT) continue;
+  if ((e.verdict.why || []).some(w => w && w.includes('Max Battle'))) continue; // 攻手升級行已有主理由
+  const atkPct = Math.max(1, Math.round(100 - e.dmx.pct));
+  e.verdict.why.push(`Max Battle 攻手：極巨攻擊估算在可極巨化型態中排名前 ${atkPct}%（Max Battle 的攻擊衡量尺度，與上面所據不同）`);
+}
 for (const e of all) e.verdict.tierName = TIER_NAME[e.verdict.tier];
 
 // ---------- 進化後招式清單（供詳細頁） ----------

@@ -140,9 +140,13 @@ function typeBadge(t) { return `<span class="type-badge" style="background:${TYP
 
 function cardHtml(f) {
   const b = bestRank(f);
+  const fmt = pct => Math.max(0.1, 100 - pct).toFixed(1).replace(/\.0$/, '');
+  // 卡片小字統一列出各衡量尺度的位置（存在就顯示，不是「適合哪邊」的意思）
   const mini = [
     f.cp50 ? 'CP ' + f.cp50 : '',
-    b ? LEAGUE_NAME[b.L] + ' #' + b.r : (f.pve && f.pve.pct != null ? 'PvE ' + f.pve.pct + '%' : ''),
+    b ? LEAGUE_NAME[b.L] + ' #' + b.r : '',
+    f.pve && f.pve.pct != null ? 'PvE 前 ' + fmt(f.pve.pct) + '%' : '',
+    f.dmx && f.dm ? 'Max 前 ' + fmt(f.dmx.pct) + '%' : '',
   ].filter(Boolean).join(' · ');
   const isSh = f.id.endsWith('_shadow');
   return `<div class="card" data-id="${f.id}" tabindex="0" role="button" aria-label="${f.zh}，${f.verdict.tierName}">
@@ -230,36 +234,47 @@ function openDetail(f) {
       <p class="muted" style="font-size:11px">快招累積能量後，於極巨階段放招；攻擊槽的極巨招式隨特殊招式屬性變化</p></div>`;
   }
 
-  // 淨化建議（僅暗影行）：去留價值 vs 淨百收機 vs 淨化省資源
+  // 淨化建議（僅暗影行）：去留價值 vs 淨百收機 vs 淨化省資源；另提醒暗影不能超級進化
   let purifyHtml = '';
   if (tags.includes('shadow')) {
     const t = f.verdict.tier;
+    // 暗影不能超級進化：物種有超級進化（母體帶 megas）→ 淨化是 Mega 的前置作業
+    const baseRow = FORMS.find(g => g.id === f.id.replace(/_shadow$/, ''));
+    const megas = baseRow && baseRow.megas || [];
+    let megaLine = '';
+    if (megas.length) {
+      const bestMega = megas.filter(m => m.pve && m.pve.pct != null).sort((a, b) => a.pve.pct - b.pve.pct)[0];
+      megaLine = `<br>· <b>暗影不能超級進化</b>：這個物種有 ${megas.map(m => m.zlabel).join('／')}，要吃超級進化的強度就得先淨化` +
+        (bestMega ? `（超級進化後估算為 PvE 前 ${(100 - bestMega.pve.pct).toFixed(1)}% 攻打手）` : '') +
+        '<br>· 以 Mega 經營為主的話，淨化的價值比暗影戰力更高——暗影 ×1.2 與 Mega 用途二選一。';
+    }
     const body = t <= 1
       ? '· <b>先別急著淨化</b>：暗影攻擊 ×1.2 是這隻保留價值的主要依據，淨化後就沒了。<br>· 例外：只差百等收藏、或你手上已有另一隻可用的暗影，淨化會更省資源。'
       : t === 2
         ? '· <b>可淨可留：</b>留著＝保有攻擊 ×1.2 的暗影戰力；淨化＝IV 全家 +2、強化省星塵糖果、Return 招式隨時可用學習器移除（暗影的 Frustration 只能在活動期間移除）。<br>· 這隻暗影名次不算突出，兩種都合理——看你想要暗影戰力還是省資源。'
         : '· <b>淨化較划算：</b>這隻的暗影指標不高，淨化後 IV +2／+2／+2、強化費用更低，還能趁需要時換招。<br>· 注意淨化是單向的——看完判定保留價值後再決定，清包前想好。';
-    purifyHtml = `<section><h3>淨化建議</h3><div class="ivref">${body}<br><br>
+    purifyHtml = `<section><h3>淨化建議</h3><div class="ivref">${body}${megaLine}<br><br>
       <b>淨百規則：</b>淨化把 IV 每項 +2（最高到 15）；原始攻／防／血都 <b>13 以上</b>的個體，淨化後即 15/15/15（淨百）。
       可用下方計算機輸入暗影個體 IV 預覽淨化後數值。</div></section>`;
   }
 
-  // 推薦帶法（PvPoke 排行組合＋PvE 估算最佳組合）
+  // 推薦帶法（PvPoke 排行組合＋PvE 估算最佳組合）；chips 包進 .moves 才有分段樣式
   let recHtml = '';
   {
     const nm = id => ((DATA.moves || {})[id] || {}).n || id;
+    const chipRow = chips => `<div class="moves">${chips.map(c => `<span class="${c[0]}">${c[1]}</span>`).join('')}</div>`;
     const lines = [];
     for (const L of [500, 1500, 2500, 10000]) {
       const p = f.pvp[L];
       if (p && p.mv && p.mv.length) {
         const cn = p.mv.slice(1).filter(Boolean).map(nm);
-        lines.push(`${LEAGUE_NAME[L]}排行 ${p.r ? '#' + p.r : '—'}：<span class="fast">${nm(p.mv[0])}</span>${cn.map(x => `<span class="charged">${x}</span>`).join('')}`);
+        lines.push(`${LEAGUE_NAME[L]}排行 ${p.r ? '#' + p.r : '—'}${chipRow([['fast', nm(p.mv[0])]].concat(cn.map(x => ['charged', x])))}`);
       }
     }
     if (f.pve && f.pve.f) {
-      lines.push(`PvE 估算最佳：<span class="fast">${nm(f.pve.f)}</span>${f.pve.c ? `<span class="charged">${nm(f.pve.c)}</span>` : '<i>（純快招循環）</i>'}`);
+      lines.push(`PvE 估算最佳${chipRow(f.pve.c ? [['fast', nm(f.pve.f)], ['charged', nm(f.pve.c)]] : [['fast', nm(f.pve.f)], ['charged', '（純快招循環）']])}`);
     }
-    if (lines.length) recHtml = `<div class="ivref" style="margin-top:6px"><b>推薦帶法</b>（PvPoke 排行組合＋PvE 估算最佳組合；實帶以你自己的配置為準）<br>${lines.join('<br>')}</div>`;
+    if (lines.length) recHtml = `<div class="ivref" style="margin-top:6px"><b>推薦帶法</b>（PvPoke 排行組合＋PvE 估算最佳組合；實帶以你自己的配置為準）${lines.map(l => `<div style="margin-top:3px">${l}</div>`).join('')}</div>`;
   }
 
   // 極巨戰估算（dm/dmg 行）：與普通 PvE 分開衡量
@@ -458,7 +473,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=11').then(r => {
+fetch('data/data.json?v=12').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
