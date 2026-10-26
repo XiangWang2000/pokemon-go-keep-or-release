@@ -135,6 +135,23 @@ h1 .sub { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8
 #detail .vchip { height: auto; padding: 5px 0; border-radius: var(--r-md); }
 #detail section { margin: 12px 0; background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
 #detail section h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+/* 折疊區塊：summary 是新標題；fdnote＝收合時可見的行內摘要 */
+#detail details.fold { margin: 12px 0; background: var(--panel2); border-radius: 10px; padding: 0; }
+#detail details.fold summary {
+  cursor: pointer; padding: 10px 12px; font-size: 13px; color: var(--accent);
+  user-select: none; list-style: none;
+}
+#detail details.fold summary::-webkit-details-marker { display: none; }
+#detail details.fold summary::before {
+  content: '▸'; display: inline-block; margin-right: 6px;
+  transition: transform .18s var(--ease-out);
+}
+#detail details.fold[open] summary::before { transform: rotate(90deg); }
+#detail details.fold .fdnote {
+  float: right; color: var(--muted); font-weight: 400; font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+#detail details.fold .foldbody { padding: 0 12px 10px; }
 table.stats { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.stats td { padding: 4px; border-bottom: 1px solid #2b3550; }
 table.stats td:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }

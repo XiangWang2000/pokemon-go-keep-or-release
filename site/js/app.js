@@ -234,28 +234,39 @@ function openDetail(f) {
       <p class="muted" style="font-size:11px">快招累積能量後，於極巨階段放招；攻擊槽的極巨招式隨特殊招式屬性變化</p></div>`;
   }
 
-  // 淨化建議（僅暗影行）：去留價值 vs 淨百收機 vs 淨化省資源；另提醒暗影不能超級進化
+  // 淨化建議（僅暗影行）：結論先行＋繁中語彙（個體值／報恩／遷怒）；暗影不能超級進化另列一條結論
   let purifyHtml = '';
   if (tags.includes('shadow')) {
     const t = f.verdict.tier;
-    // 暗影不能超級進化：物種有超級進化（母體帶 megas）→ 淨化是 Mega 的前置作業
+    const body = t <= 1
+      ? '<p style="margin:0 0 8px"><b>結論：先保留暗影（不淨化）</b><br>' +
+        '· 這隻的評級是以「暗影身分」判的：暗影攻擊 ×1.2 的加成<b>就是</b>保留價值的主要依據，淨化後就消失了。<br>' +
+        '· 會考慮淨化的只有兩種情況：①手上已有另一隻同物種夠用的暗影；②個體值只差一下就 15/15/15（淨百），想要滿個體做收藏。</p>'
+      : t === 2
+        ? '<p style="margin:0 0 8px"><b>結論：兩種都合理，照用途挑</b><br>' +
+          '· <b>會拿去出戰</b>（道館、團體戰或聯盟對戰）→ 留暗影：攻擊 ×1.2 的加成讓這隻還有戰力。<br>' +
+          '· <b>只是囤著／背包爆了</b> → 淨化：個體值各 +2（上限 15）、強化省星塵，招式變成「報恩」且隨時能用「招式學習器」換掉（暗影招式「遷怒」只能在限定活動期間更換）。<br>' +
+          '· 簡單講：<b>確定會用的留暗影，囤著沒在用的淨化。</b></p>'
+        : '<p style="margin:0 0 8px"><b>結論：淨化比較划算</b><br>' +
+          '· 這隻以暗影身分出戰的名次本來就低，×1.2 的加成也救不回來；淨化後個體值 +2／+2／+2、強化省星塵，招式改成「報恩」、可用招式學習器隨時更換。<br>' +
+          '· 沒有「非留暗影不可」的理由——淨化是單向的，確定不後悔就淨。</p>';
+    // 暗影不能超級進化：物種有超級進化（母體帶 megas）→ 淨化是超級進化的前置門檻
     const baseRow = FORMS.find(g => g.id === f.id.replace(/_shadow$/, ''));
     const megas = baseRow && baseRow.megas || [];
     let megaLine = '';
     if (megas.length) {
       const bestMega = megas.filter(m => m.pve && m.pve.pct != null).sort((a, b) => a.pve.pct - b.pve.pct)[0];
-      megaLine = `<br>· <b>暗影不能超級進化</b>：這個物種有 ${megas.map(m => m.zlabel).join('／')}，要吃超級進化的強度就得先淨化` +
-        (bestMega ? `（超級進化後估算為 PvE 前 ${(100 - bestMega.pve.pct).toFixed(1)}% 攻打手）` : '') +
-        '<br>· 以 Mega 經營為主的話，淨化的價值比暗影戰力更高——暗影 ×1.2 與 Mega 用途二選一。';
+      megaLine = '<p style="margin:0"><b>結論：想玩這隻的「超級進化」就必須先淨化</b><br>' +
+        '· 暗影個體<b>不能</b>超級進化——這個物種的超級進化型態' +
+        (bestMega ? `估算為攻打道館／團體戰前 ${(100 - bestMega.pve.pct).toFixed(1)}% 的輸出戰力` : `有 ${megas.map(m => m.zlabel).join('／')}`) +
+        '，要吃這份強度就得先淨化。<br>' +
+        '· 暗影加成與超級進化只能二選一：不缺暗影打手、常打超級進化戰的話，淨化較划算。</p>';
     }
-    const body = t <= 1
-      ? '· <b>先別急著淨化</b>：暗影攻擊 ×1.2 是這隻保留價值的主要依據，淨化後就沒了。<br>· 例外：只差百等收藏、或你手上已有另一隻可用的暗影，淨化會更省資源。'
-      : t === 2
-        ? '· <b>可淨可留：</b>留著＝保有攻擊 ×1.2 的暗影戰力；淨化＝IV 全家 +2、強化省星塵糖果、Return 招式隨時可用學習器移除（暗影的 Frustration 只能在活動期間移除）。<br>· 這隻暗影名次不算突出，兩種都合理——看你想要暗影戰力還是省資源。'
-        : '· <b>淨化較划算：</b>這隻的暗影指標不高，淨化後 IV +2／+2／+2、強化費用更低，還能趁需要時換招。<br>· 注意淨化是單向的——看完判定保留價值後再決定，清包前想好。';
-    purifyHtml = `<section><h3>淨化建議</h3><div class="ivref">${body}${megaLine}<br><br>
-      <b>淨百規則：</b>淨化把 IV 每項 +2（最高到 15）；原始攻／防／血都 <b>13 以上</b>的個體，淨化後即 15/15/15（淨百）。
-      可用下方計算機輸入暗影個體 IV 預覽淨化後數值。</div></section>`;
+    const footer = '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-size:11px;color:var(--muted)">' +
+      '淨化是<b>單向</b>的；要花糖果與星塵（一般物種約 1 糖＋1000 星塵，實際以遊戲內顯示為準）。' +
+      '<br><b>淨百規則：</b>淨化把個體值每項 +2（最高到 15）；原始攻／防／血都 13 以上的個體，淨化後即 15/15/15（淨百）。' +
+      '可用下方「IV 排名計算機」輸入暗影個體值，預覽淨化後數值。</div>';
+    purifyHtml = `<div class="ivref">${body}${megaLine}${footer}</div>`;
   }
 
   // 推薦帶法（PvPoke 排行組合＋PvE 估算最佳組合）；chips 包進 .moves 才有分段樣式
@@ -281,37 +292,42 @@ function openDetail(f) {
   let dmxHtml = '';
   if (f.dmx && (f.dm || f.dmg)) {
     const atkPct = Math.max(0.1, 100 - f.dmx.pct).toFixed(1).replace(/\.0$/, '');
-    dmxHtml = `<section><h3>極巨戰（Max Battle）攻擊估算</h3><table class="stats">
+    dmxHtml = `<details class="fold"><summary>極巨戰（Max Battle）攻擊估算<span class="fdnote">攻手前 ${atkPct}%</span></summary><div class="foldbody"><table class="stats">
       <tr><td>極巨攻擊循環 DPS 估算</td><td>${f.dmx.dps}</td></tr>
       <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（可極巨化型態內）</td></tr></table>
       <div class="ivref" style="margin-top:6px">Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主（威力 250、屬性隨特殊招式變化）——衡量尺度和普通 PvE 不同，別互相套用。<br>
       · 這個排名看「攻擊體質＋快招集能速度」；要一場連發多發極巨攻擊，也參考有效體質（撐到第六階段就得多發）。<br>
-      ${f.dmg ? '· 超極巨化個體攻擊槽是專屬超極巨招式，目標類型有差但威力同屬 250 尺度，估算一併適用。' : ''}</div></section>`;
+      ${f.dmg ? '· 超極巨化個體攻擊槽是專屬超極巨招式，目標類型有差但威力同屬 250 尺度，估算一併適用。' : ''}</div></div></details>`;
   }
+
+  // 折疊容器：核心決策區（判定理由＋淨化建議＋招式）預設展開，其餘數值細節預設收合；
+  // note＝收合時也能看到的行內摘要，讓使用者不必展開就知道裡面有什麼
+  const fold = (open, title, note, inner) =>
+    `<details class="fold"${open ? ' open' : ''}><summary>${title}${note ? `<span class="fdnote">${note}</span>` : ''}</summary><div class="foldbody">${inner}</div></details>`;
 
   $('#detailBody').innerHTML = `
     <h2>${f.zh}</h2><div class="en">${f.en} · #${f.dex} · id: ${f.id}</div>
     <img class="sprite${f.id.endsWith('_shadow') ? ' shadowicon' : ''}" src="${spriteOf(f)}" alt="${f.zh} 的遊戲內圖示">
     <div class="vchip t${f.verdict.tier}" style="width:100%;display:block">${f.verdict.tierName}</div>
 
-    <section><h3>判定理由</h3><ul class="why">${f.verdict.why.map(w => `<li>${w}</li>`).join('')}</ul></section>
+    ${fold(true, '判定理由', null, `<ul class="why">${f.verdict.why.map(w => `<li>${w}</li>`).join('')}</ul>`)}
 
-    ${purifyHtml}
+    ${tags.includes('shadow') ? fold(true, '淨化建議', null, purifyHtml) : ''}
 
-    ${f.megas ? `<section><h3>超級進化／原始回歸型態（母體進行）</h3><div class="megalist">${f.megas.map(m => `
+    ${f.megas ? fold(false, '超級進化／原始回歸型態', f.megas.length + ' 種', `<div class="megalist">${f.megas.map(m => `
       <div class="megabox"><img class="megasprite" src="${UICONS}${m.icon}" alt="${m.zlabel}">
         <div><b>${m.zlabel}</b>・建議 IV／糖果需求比照一般進化<br>
         種族值 ${m.a}/${m.d}/${m.h} · ${m.t.map(typeBadge).join('')}<br>
         ${m.pve ? `PvE 估算：循環 DPS ${m.pve.dps}／強度前 ${(100 - m.pve.pct).toFixed(1)}%` : '無招式估算'}
-        <br><span style="color:var(--muted);font-size:11px">超級進化型態無法參加聯盟對戰</span></div></div>`).join('')}</div></section>` : ''}
+        <br><span style="color:var(--muted);font-size:11px">超級進化型態無法參加聯盟對戰</span></div></div>`).join('')}</div>`) : ''}
 
-    <section><h3>對戰排名（PvPoke）</h3><div class="chips">${rankChips || '未進入各聯賽排名'}</div></section>
+    ${fold(false, '對戰排名（PvPoke）', b ? LEAGUE_NAME[b.L] + ' #' + b.r : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
 
-    <section><h3>限制盃／特殊盃賽排名（meta 隨季度輪替，抓取日 ${DATA.cupFetched || '—'}）</h3>
-      <div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div></section>
+    ${fold(false, '限制盃／特殊盃賽排名', (f.cupR && f.cupR.length) ? f.cupR.length + ' 項上榜' : '未上榜', `<div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div>
+      <p class="muted" style="font-size:11px;margin:6px 0 0">meta 隨季度輪替，抓取日 ${DATA.cupFetched || '—'}</p>`)}
 
-    <section><h3>PvE 攻打輸出估算（已計入屬性一致加成）</h3>
-      ${f.pve ? `<table class="stats">
+    ${fold(false, '道館／團體戰輸出估算（PvE）', f.pve ? '強度前 ' + (100 - f.pve.pct).toFixed(1).replace(/\.0$/, '') + '%' : null,
+      (f.pve ? `<table class="stats">
         <tr><td>循環 DPS 估算</td><td>${f.pve.dps}</td></tr>
         <tr><td>強度百分位</td><td>前 ${(100 - f.pve.pct).toFixed(1)}%</td></tr></table>
       <div class="ivref" style="margin-top:6px">PvE 留哪隻？（只適用會實際上場、強度也夠的攻打手）：<br>
@@ -319,32 +335,32 @@ function openDetail(f) {
         · <b>糖果昂貴的物種（傳說、稀有的區域限定）</b>：先留「等級最高／星數最多」那隻，起點高最省糖；<b>等級相同</b>才用攻 IV 挑。<br>
         · IV 之後<b>改不了</b>沒錯，但「改不了」不代表「影響大」——升一級力量級帶來的 DPS 增益，遠大於攻 IV 0→15 整條加起來。<br>
         · 防／血 IV 確實影響「能挨幾下打」，但 GO 的傷害計算<b>取整數</b>，IV 的小幅起伏大多不會改變挨打次數——決定挨幾下的是<b>物種體質與等級</b>；IV 差異常常一整場團體戰都不會變成多挨或少挨一下。<br>
-        · 強度百分位偏低的型態，就算攻 IV 滿也沒必要留。</div>` : '無招式資料'}</section>
+        · 強度百分位偏低的型態，就算攻 IV 滿也沒必要留。</div>` : '無招式資料'))}
 
-    ${dmxHtml}
+    ${dmxHtml ? dmxHtml : ''}
 
-    <section><h3>建議對戰 IV（rank 1 參考）</h3><div class="ivlines">${ivRefs}</div>
-      <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div></section>
+    ${fold(false, '建議對戰個體值（rank 1 參考）', null, `<div class="ivlines">${ivRefs}</div>
+      <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div>`)}
 
-    <section id="ivCalc"><h3>IV 排名計算機</h3>
-      <div class="ivfields">
+    ${fold(false, 'IV 排名計算機', null,
+      `<div class="ivfields">
         <label class="ivfield"><span>攻擊</span><input id="ivA" type="number" min="0" max="15" value="15" aria-label="攻擊個體值 0 到 15"></label>
         <label class="ivfield"><span>防禦</span><input id="ivD" type="number" min="0" max="15" value="15" aria-label="防禦個體值 0 到 15"></label>
         <label class="ivfield"><span>血量（耐力）</span><input id="ivH" type="number" min="0" max="15" value="15" aria-label="耐力（血量）個體值 0 到 15"></label>
         <label class="ivfield ivleague"><span>聯盟上限</span><select id="ivLeague" aria-label="聯盟上限">${[500, 1500, 2500, 10000].map(L => `<option value="${L}" ${L == 1500 ? 'selected' : ''}>${LEAGUE_NAME[L]}</option>`).join('')}</select></label>
       </div>
       <button id="ivGo">計算排名</button>
-      <div id="ivResult"></div></section>
+      <div id="ivResult"></div>`)}
 
-    <section><h3>種族值＆上限</h3><table class="stats">
+    ${fold(false, '種族值＆上限', null, `<table class="stats">
       <tr><td>攻 / 防 / 血（基礎）</td><td>${f.a} / ${f.d} / ${f.h}</td></tr>
       <tr><td>最高 CP（Lv50 滿個體）</td><td>${f.cp50}</td></tr>
       ${(f.bulkPct >= 85) ? `<tr><td>守館體質</td><td>有效體質（HP×DEF）排行前 <b>${(100 - f.bulkPct).toFixed(1).replace(/\.0$/, '')}%</b>——能占守道館較久；但守館收益本來就低（金幣有上限／被淘汰就結束），只當參考指標</td></tr>` : ''}
       <tr><td>標籤</td><td>${tags.map(t => tagNames[t] || t).concat(f.dmg ? ['超極巨化'] : f.dm ? ['極巨化'] : []).join('、') || '一般'}</td></tr>
       ${f.li ? '<tr><td></td><td>⚠ 超級聯盟禁入</td></tr>' : ''}
-    </table></section>
+    </table>`)}
 
-    <section><h3>招式</h3><div class="moves">${fast}${charged}</div>${recHtml}${maxBlock}</section>
+    ${fold(true, '招式與推薦帶法', null, `<div class="moves">${fast}${charged}</div>${recHtml}${maxBlock}`)}
 
     <section><h3>我的收藏</h3>
       <button class="markBtn" id="markBtn">${marks[f.id] ? '✓ 已標記：' + marks[f.id] + '（再點一次取消）' : '標記這隻（點擊循環：保留 → 可送 → 已送）'}</button>
@@ -473,7 +489,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=12').then(r => {
+fetch('data/data.json?v=13').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
