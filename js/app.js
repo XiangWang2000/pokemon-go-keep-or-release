@@ -79,6 +79,10 @@ function capName(cp) {
   const c = ((DATA && DATA.cups) || []).find(x => x.cp === +cp);
   return c ? c.zh : 'CP' + cp;
 }
+// 排行榜顯示名：500 那格是 PvPoke 的「格式總榜」（非現行小小盃盃規），顯示時不能混叫小小盃
+function rankName(L) {
+  return L === 500 ? '500 格式總榜' : LEAGUE_NAME[L];
+}
 
 /* ---------- CP / IV 排名計算 ---------- */
 // 正規半級 CPM 表（levels 1, 1.5, 2, …, 50；取自 GO GameMaster cpMultiplier，
@@ -160,7 +164,7 @@ function cardHtml(f) {
   // 卡片小字統一列出各衡量尺度的位置（存在就顯示，不是「適合哪邊」的意思）
   const mini = [
     f.cp50 ? 'CP ' + f.cp50 : '',
-    b && b.r <= 500 ? LEAGUE_NAME[b.L] + ' #' + b.r : '', // #501 之後的尾段名次對新手無意義，不上卡面（詳細頁仍有全榜）
+    b && b.r <= 500 ? rankName(b.L) + ' #' + b.r : '', // #501 之後的尾段名次對新手無意義，不上卡面（詳細頁仍有全榜）
     f.pve && f.pve.pct != null ? 'PvE 前 ' + fmt(f.pve.pct) + '%' : '',
     f.dmx && f.dm ? 'Max 前 ' + fmt(f.dmx.pct) + '%' : '',
   ].filter(Boolean).join(' · ');
@@ -238,7 +242,7 @@ function openDetail(f) {
   const tags = f.tags || [];
   const tagNames = { legendary: '傳說', wildlegendary: '野外傳說', mythical: '幻獸', ultrabeast: '異獸', regional: '區域限定', mega: '超級進化', supermega: '超級進化(X/Y)', shadow: '已暗影', shadoweligible: '物種有暗影版（火箭隊獲取，一般個體不可轉換）', alolan: '阿羅拉', galarian: '伽勒爾', hisuian: '洗翠', paldean: '帕底亞', starter: '御三家', duplicate: '重複型態' };
   if (f.dmg) tagNames.dmg = '超極巨化'; else if (f.dm) tagNames.dm = '極巨化';
-  const rankChips = [500, 1500, 2500, 10000].map(L => f.pvp[L] ? `<span class="rankchip" title="PvPoke 評分 ${f.pvp[L].rating ?? '—'}（愈高愈強，衡量門檻寬窄）">${LEAGUE_NAME[L]} <b>#${f.pvp[L].r}</b>${f.pvp[L].rating != null ? ' · ' + f.pvp[L].rating : ''}</span>` : '').join('');
+  const rankChips = [500, 1500, 2500, 10000].map(L => f.pvp[L] ? `<span class="rankchip" title="${L === 500 ? 'PvPoke 500 CP 格式總榜（非現行小小盃盃規）；現行小小盃榜見「限制盃／特殊盃賽排名」' : 'PvPoke 評分（模擬值，不同聯盟尺度不同）：' + (f.pvp[L].rating ?? '—')}">${rankName(L)} <b>#${f.pvp[L].r}</b></span>` : '').join('');
   const cupChips = (f.cupR || []).map(c => {
     const cd = (DATA.cups || [])[c[0]];
     return cd ? `<span class="rankchip cupchip" title="${cd.zh}（CP 上限 ${cd.cp}，榜單共 ${cd.total} 型態）／資料 ${DATA.cupFetched} 撈取">${cd.zh} <b>#${c[1]}</b></span>` : '';
@@ -306,7 +310,7 @@ function openDetail(f) {
       const p = f.pvp[L];
       if (p && p.mv && p.mv.length) {
         const cn = p.mv.slice(1).filter(Boolean).map(nm);
-        lines.push(`${LEAGUE_NAME[L]}排行 ${p.r ? '#' + p.r : '—'}${chipRow([['fast', nm(p.mv[0])]].concat(cn.map(x => ['charged', x])))}`);
+        lines.push(`${rankName(L)}排行 ${p.r ? '#' + p.r : '—'}${chipRow([['fast', nm(p.mv[0])]].concat(cn.map(x => ['charged', x])))}`);
       }
     }
     if (f.pve && f.pve.f) {
@@ -361,7 +365,7 @@ function openDetail(f) {
         ${m.pve ? `PvE 估算：循環 DPS ${m.pve.dps}／強度前 ${(100 - m.pve.pct).toFixed(1)}%` : '無招式估算'}
         <br><span style="color:var(--muted);font-size:11px">超級進化型態無法參加聯盟對戰</span></div></div>`).join('')}</div>`) : ''}
 
-    ${fold(false, '對戰排名（PvPoke）', b ? (b.r <= 500 ? LEAGUE_NAME[b.L] + ' #' + b.r : '聯盟榜後段') : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
+    ${fold(false, '對戰排名（PvPoke）', b ? (b.r <= 500 ? rankName(b.L) + ' #' + b.r : '聯盟榜後段') : '無名次', `<div class="chips">${rankChips || '未進入各聯賽排名'}</div>`)}
 
     ${fold(false, '限制盃／特殊盃賽排名', (f.cupR && f.cupR.length) ? f.cupR.length + ' 項上榜' : '未上榜', `<div class="ivref" style="margin-bottom:8px">剛入坑可先<b>忽略這區</b>——這些是限定的活動賽制，看上面的普通聯盟名次就夠了。</div><div class="chips">${cupChips || '<span class="ivref">未進入任何現行盃賽榜單</span>'}</div>
       <p class="muted" style="font-size:11px;margin:6px 0 0">榜單隨季度輪替，抓取日 ${DATA.cupFetched || '—'}</p>`)}
@@ -532,7 +536,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=15').then(r => {
+fetch('data/data.json?v=16').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
@@ -541,9 +545,10 @@ fetch('data/data.json?v=15').then(r => {
   const dd = document.getElementById('dataDate');
   if (dd && DATA.meta && DATA.meta.date) dd.textContent = `資料更新日：${DATA.meta.date}（榜單來源 PvPoke、盃賽榜 ${DATA.cupFetched || '—'} 撈取）`;
   $('#loadingState') && $('#loadingState').remove();
-  // 屬性下拉
+  // 屬性下拉（填充完補回存檔的篩選值：還原時序在載入前，選項卻在載入後才有）
   const types = [...new Set(FORMS.flatMap(f => f.t))].sort();
   $('#filterType').innerHTML = '<option value="">全部屬性</option>' + types.map(t => `<option value="${t}">${TYPE_ZH[t]}</option>`).join('');
+  $('#filterType').value = filtr.type;
   // 招式名稱預組
   for (const f of FORMS) {
     f.fm = (d.movesFor && d.movesFor[f.id]?.fast || []).map(id => d.moves[id]?.n || id);

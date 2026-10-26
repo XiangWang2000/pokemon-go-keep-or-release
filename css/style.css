@@ -98,9 +98,9 @@ h1 .sub { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8
 .t1 { background: var(--softkeep); color: #071a2b; }
 .t2 { background: var(--maybe); color: #2b1e05; }
 .t3 { background: var(--send); color: #14171c; }
-/* 我的標記角章：不遮內容、一眼可比對狀態 */
+/* 我的標記角章：右上角（左上角是形態徽章），一眼可比對狀態 */
 .markchip {
-  position: absolute; left: 6px; top: 6px; z-index: 2;
+  position: absolute; right: 6px; top: 6px; z-index: 2;
   font-size: 9px; padding: 1px 5px; border-radius: 999px;
   background: #2c3650; color: #fff; opacity: .95;
 }
@@ -123,6 +123,12 @@ h1 .sub { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8
 #guide .guidebody { padding: 0 14px 12px; font-size: 12.5px; line-height: 1.7; }
 #guide .guidebody ol { margin: 6px 0; padding-left: 20px; }
 #guide .guidebody p { margin: 8px 0 0; }
+#guide .gloss {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px 16px;
+  margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px;
+}
+#guide .gloss li { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+@media (max-width: 640px) { #guide .gloss { grid-template-columns: 1fr; } }
 
 /* ---------- 詳細面板（唯一送出的動效時刻：右側滑入 220ms） ---------- */
 #detail {
@@ -213,22 +219,23 @@ table.stats td:last-child b { color: var(--text); }
 .maxmoves b { color: var(--softkeep); }
 .muted { color: var(--muted); }
 /* ---------- IV 計算機 ---------- */
-#ivCalc .ivfields {
+/* 選擇器掛 #detail（詳細面板動態生成、無固定 id） */
+#detail .ivfields {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 2px;
 }
-#ivCalc .ivfield { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-#ivCalc .ivfield span { font-size: 11px; color: var(--muted); }
-#ivCalc .ivleague { grid-column: 1 / -1; }
-#ivCalc input, #ivCalc select {
+#detail .ivfield { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#detail .ivfield span { font-size: 11px; color: var(--muted); }
+#detail .ivleague { grid-column: 1 / -1; }
+#detail input, #detail select {
   width: 100%; background: var(--bg); color: var(--text); border: 1px solid #34405a;
   border-radius: var(--r-sm); padding: 8px; text-align: center; font-family: inherit; font-size: 14px;
   transition: border-color .15s var(--ease-out);
 }
-#ivCalc select { text-align: left; }
-#ivCalc input:hover, #ivCalc select:hover { border-color: var(--line-focus); }
-#ivCalc input:focus, #ivCalc select:focus { border-color: var(--accent); outline: none; }
-#ivCalc input::-webkit-outer-spin-button, #ivCalc input::-webkit-inner-spin-button { opacity: .4; }
-#ivCalc button, .markBtn {
+#detail select { text-align: left; }
+#detail input:hover, #detail select:hover { border-color: var(--line-focus); }
+#detail input:focus, #detail select:focus { border-color: var(--accent); outline: none; }
+#detail input::-webkit-outer-spin-button, #detail input::-webkit-inner-spin-button { opacity: .4; }
+#detail button, .markBtn {
   background: var(--accent); border: none; color: #241c00; font-weight: 700;
   border-radius: var(--r-md); padding: 8px 12px; cursor: pointer; font-family: inherit;
   transition: filter .15s var(--ease-out), transform .15s var(--ease-out);
