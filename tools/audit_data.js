@@ -5,7 +5,7 @@
  */
 const fs = require('fs');
 const d = JSON.parse(fs.readFileSync('site/data/data.json', 'utf8'));
-const uicons = new Set(JSON.parse(fs.readFileSync('data_uicons_filelist.json', 'utf8')));
+const uicons = new Set(JSON.parse(fs.readFileSync('data/uicons_filelist.json', 'utf8')));
 
 let errors = 0;
 const err = (m) => { errors++; console.log('  ❌ ' + m); };

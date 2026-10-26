@@ -1,22 +1,22 @@
 /*
  * build_data.js — 整合所有資料源，產出 site/data/data.json
  * 來源:
- *  - data_pvpoke_gamemaster.json (PvPoke GameMaster: 1751 型態、種族值、招式、標籤)
- *  - data_pvpoke_{500,1500,2500,10000}.json (PvPoke 各聯盟排名)
- *  - data_cup_rankings.json (PvPoke 現行盃賽/特殊格式排名，由 tools/fetch_cup_rankings.js 產出)
- *  - data_names_zh_hant.json (官方繁體譯名, index = dex-1)
- *  - data_cpm.json (CP 倍率表, index = level-1)
- *  - data_moves_zh.json (招式官方繁中譯名, 可選)
+ *  - data/pvpoke_gamemaster.json (PvPoke GameMaster: 1751 型態、種族值、招式、標籤)
+ *  - data/pvpoke_{500,1500,2500,10000}.json (PvPoke 各聯盟排名)
+ *  - data/cup_rankings.json (PvPoke 現行盃賽/特殊格式排名，由 tools/fetch_cup_rankings.js 產出)
+ *  - data/names_zh_hant.json (官方繁體譯名, index = dex-1)
+ *  - data/cpm.json (CP 倍率表, index = level-1)
+ *  - data/moves_zh.json (招式官方繁中譯名, 可選)
  */
 const fs = require('fs');
 
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 // GO Game Master 抽取資料（tools/fetch_go_gm.js）：PvE 招式數據 + 進化方向
-const goGm = fs.existsSync('data_go_gm.json')
-  ? JSON.parse(fs.readFileSync('data_go_gm.json', 'utf8'))
+const goGm = fs.existsSync('data/go_gm.json')
+  ? JSON.parse(fs.readFileSync('data/go_gm.json', 'utf8'))
   : { moves: {}, evo: {} };
 if (!goGm.moves || !Object.keys(goGm.moves).length) {
-  console.log('警告：缺 data_go_gm.json（node tools/fetch_go_gm.js），PvE 估算將退回 PvPoke 近似值');
+  console.log('警告：缺 data/go_gm.json（node tools/fetch_go_gm.js），PvE 估算將退回 PvPoke 近似值');
 }
 
 // 排除：主題造型物種（個人品項無法量化，不列入清單）
@@ -135,12 +135,12 @@ const GO_FORMLESS_BASE = new Set([
   console.log('進化方向（GO GM 為準）:', applied.length, '物種；PvPoke 差異覆寫', mismatched.length, '處');
   if (mismatched.length) console.log('  差異明細:', mismatched.join(' '));
 }
-const namesZh = JSON.parse(fs.readFileSync('data_names_zh_hant.json', 'utf8'));
+const namesZh = JSON.parse(fs.readFileSync('data/names_zh_hant.json', 'utf8'));
 // ---------- GO 譯名覆蓋 ----------
 // 本站的讀者是 GO 玩家，譯名以 GO 遊戲內實際顯示為準（PokeMiners Latest APK 繁中字串，
-// 由 tools/build_go_names.js 解析成 data_go_names_zhtw.json）。GO 的在地名與主系列官方譯名
+// 由 tools/build_go_names.js 解析成 data/go_names_zhtw.json）。GO 的在地名與主系列官方譯名
 // 有 81 處不同（如 Tyrogue＝「無畏小子」而非主系列的「巴爾郎」）——僅在主系列名存在時覆蓋。
-const goNames = JSON.parse(fs.readFileSync('data_go_names_zhtw.json', 'utf8'));
+const goNames = JSON.parse(fs.readFileSync('data/go_names_zhtw.json', 'utf8'));
 {
   let goOverride = 0;
   for (const [dex, go] of Object.entries(goNames)) {
@@ -148,15 +148,15 @@ const goNames = JSON.parse(fs.readFileSync('data_go_names_zhtw.json', 'utf8'));
   }
   console.log('GO 譯名覆蓋:', goOverride, '隻（源：PokeMiners GO APK 繁中字串）');
 }
-const cpm = JSON.parse(fs.readFileSync('data_cpm.json', 'utf8'));
+const cpm = JSON.parse(fs.readFileSync('data/cpm.json', 'utf8'));
 let moveZh = {};
-try { moveZh = JSON.parse(fs.readFileSync('data_moves_zh.json', 'utf8')); } catch (e) { console.log('(move names zh not ready yet)'); }
+try { moveZh = JSON.parse(fs.readFileSync('data/moves_zh.json', 'utf8')); } catch (e) { console.log('(move names zh not ready yet)'); }
 
 // 圖示/極巨化輔助資料
 let reactmap = null, uiconsFiles = null, maxData = null;
-try { reactmap = JSON.parse(fs.readFileSync('data_wwm_reactmap.json', 'utf8')); } catch (e) {}
-try { uiconsFiles = new Set(JSON.parse(fs.readFileSync('data_uicons_filelist.json', 'utf8'))); } catch (e) {}
-try { maxData = JSON.parse(fs.readFileSync('data_max.json', 'utf8')); } catch (e) {}
+try { reactmap = JSON.parse(fs.readFileSync('data/wwm_reactmap.json', 'utf8')); } catch (e) {}
+try { uiconsFiles = new Set(JSON.parse(fs.readFileSync('data/uicons_filelist.json', 'utf8'))); } catch (e) {}
+try { maxData = JSON.parse(fs.readFileSync('data/max.json', 'utf8')); } catch (e) {}
 
 // 排除：主題造型物種（個人品項無法量化，不列入清單）
 
@@ -167,17 +167,17 @@ function loadRankings(file) {
   return map;
 }
 const ranks = {
-  500: loadRankings('data_pvpoke_500.json'),
-  1500: loadRankings('data_pvpoke_1500.json'),
-  2500: loadRankings('data_pvpoke_2500.json'),
-  10000: loadRankings('data_pvpoke_10000.json'),
+  500: loadRankings('data/pvpoke_500.json'),
+  1500: loadRankings('data/pvpoke_1500.json'),
+  2500: loadRankings('data/pvpoke_2500.json'),
+  10000: loadRankings('data/pvpoke_10000.json'),
 };
 const LEAGUES = [500, 1500, 2500, 10000];
 const LEAGUE_ZH = { 500: '小小盃', 1500: '超級聯盟', 2500: '高級聯盟', 10000: '大師聯盟' };
 
 // ---------- 盃賽／特殊格式排行（限制盃人選查詢用） ----------
 let cupData = null;
-try { cupData = JSON.parse(fs.readFileSync('data_cup_rankings.json', 'utf8')); } catch (e) { console.log('(cup rankings not ready yet)'); }
+try { cupData = JSON.parse(fs.readFileSync('data/cup_rankings.json', 'utf8')); } catch (e) { console.log('(cup rankings not ready yet)'); }
 const cupIndexMap = {};
 const cupMeta = [];
 if (cupData) cupData.cups.forEach((c, i) => { cupIndexMap[c.key] = i; cupMeta.push({ k: c.key, cp: c.cp, zh: c.zh, total: c.total }); });
@@ -404,7 +404,7 @@ for (const p of gm.pokemon) {
     icon: iconOf(dex, collected),
     evoNext: fam.evolutions && fam.evolutions.length ? [...new Set(fam.evolutions)] : undefined,
   };
-  // 極巨化/超極巨化（data_max.json 由 pokemondb 極巨化清單解析而來）
+  // 極巨化/超極巨化（data/max.json 由 pokemondb 極巨化清單解析而來）
   if (maxData) {
     const mx = maxData[p.speciesId];
     if (mx) { entry.dm = true; if (mx.dmg) entry.dmg = true; }

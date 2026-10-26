@@ -12,12 +12,12 @@ function peek(name, file, count = 3) {
   }
 }
 
-peek('pvpoke gamemaster', 'data_pvpoke_gamemaster.json');
-peek('pvpoke rankings 1500', 'data_pvpoke_1500.json');
-peek('pvpoke rankings 500', 'data_pvpoke_500.json');
-peek('pvpoke rankings 2500', 'data_pvpoke_2500.json');
+peek('pvpoke gamemaster', 'data/pvpoke_gamemaster.json');
+peek('pvpoke rankings 1500', 'data/pvpoke_1500.json');
+peek('pvpoke rankings 500', 'data/pvpoke_500.json');
+peek('pvpoke rankings 2500', 'data/pvpoke_2500.json');
 
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 const sample = gm.find(p => p.speciesId && p.speciesId.includes('alolan')) || gm[2];
 console.log('\n==== gamemaster form entry sample ====');
 console.log(JSON.stringify(sample, null, 1).slice(0, 1500));

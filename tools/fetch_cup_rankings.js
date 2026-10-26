@@ -1,5 +1,5 @@
 /*
- * fetch_cup_rankings.js — 抓 PvPoke 現行「盃賽／特殊格式」排行榜，產出 data_cup_rankings.json
+ * fetch_cup_rankings.js — 抓 PvPoke 現行「盃賽／特殊格式」排行榜，產出 data/cup_rankings.json
  * PvPoke 資料路徑：data/rankings/{cup}/{category}/rankings-{cp}.json  (category 在前！)
  * 盃賽 meta 有輪替，此清單以 gamemaster.json 的 formats（hideRankings=false）為準，抓取時自動略過失效格式。
  */
@@ -35,7 +35,7 @@ async function getJson(url) {
 (async () => {
   // 舊檔先讀進記憶體：下載失敗的盃賽沿用舊資料，絕不讓網路錯誤「清空證據」
   let prev = null;
-  try { prev = JSON.parse(fs.readFileSync('data_cup_rankings.json', 'utf8')); } catch (e) { prev = null; }
+  try { prev = JSON.parse(fs.readFileSync('data/cup_rankings.json', 'utf8')); } catch (e) { prev = null; }
 
   const out = { fetched: new Date().toISOString().slice(0, 10), cups: [] };
   let missed = [];
@@ -77,14 +77,14 @@ async function getJson(url) {
   if (prev && prev.cups && prev.cups.length && out.cups.length < prev.cups.length) {
     const dropped = prev.cups.filter(x => !out.cups.some(y => y.key === x.key));
     console.error('錯誤：本次盃賽數(%d)少於上次(%d)，疑似格式下架或下載失敗：', out.cups.length, prev.cups.length, dropped.map(d => d.key).join(', '));
-    console.error('已保留舊檔不覆寫；若確認為正式下架請手動刪除 data_cup_rankings.json 後重跑');
+    console.error('已保留舊檔不覆寫；若確認為正式下架請手動刪除 data/cup_rankings.json 後重跑');
     process.exit(1);
   }
 
   // 原子寫入：先寫暫存再改名，中斷不會留下半損檔
-  fs.writeFileSync('data_cup_rankings.json.tmp', JSON.stringify(out));
-  fs.renameSync('data_cup_rankings.json.tmp', 'data_cup_rankings.json');
-  const size = (fs.statSync('data_cup_rankings.json').size / 1024).toFixed(1);
+  fs.writeFileSync('data/cup_rankings.json.tmp', JSON.stringify(out));
+  fs.renameSync('data/cup_rankings.json.tmp', 'data/cup_rankings.json');
+  const size = (fs.statSync('data/cup_rankings.json').size / 1024).toFixed(1);
   console.log('盃賽數:', out.cups.length, '/', CUPS.length, '| 檔案大小:', size, 'KB', '| 撈取日:', out.fetched);
   if (missed.length) {
     console.error('警告：有 ' + missed.length + ' 個盃賽下載失敗（沿用舊資料），命令以非零碼結束');

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 
 console.log('top keys:', Object.keys(gm).join(', '));
 const pokes = gm.pokemon || [];

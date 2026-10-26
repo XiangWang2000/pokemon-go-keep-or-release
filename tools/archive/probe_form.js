@@ -1,5 +1,5 @@
 const fs = require('fs');
-const raw = fs.readFileSync('data_pokeminers_gm_raw.json', 'utf8');
+const raw = fs.readFileSync('data/pokeminers_gm_raw.json', 'utf8');
 
 console.log('-- dynamax/gmax 全文搜尋 --');
 for (const k of ['ynamax', 'igantamax', 'maxMove', 'maxLaunchLevel', 'PowerSpot', 'powerSpot']) {

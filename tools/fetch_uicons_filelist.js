@@ -23,5 +23,5 @@ function getJson(url) {
   };
   for (const d of [19, 6, 27, 487, 386, 555, 9, 264, 100]) show(d);
 
-  fs.writeFileSync('data_uicons_filelist.json', JSON.stringify(files));
+  fs.writeFileSync('data/uicons_filelist.json', JSON.stringify(files));
 })();

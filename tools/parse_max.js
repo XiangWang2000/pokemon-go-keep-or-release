@@ -1,11 +1,11 @@
 // parse_max.js — 從 pokemondb dynamax-attackers 頁 markdown 解析 D-Max / G-Max 物種清單
 // 對照源直接用 PvPoke gamemaster（speciesName/speciesId 為唯一權威鍵）
-// 輸出: data_max.json = { "<speciesId>": { dm: true, dmg: true, name, form } }
+// 輸出: data/max.json = { "<speciesId>": { dm: true, dmg: true, name, form } }
 const fs = require('fs');
 
 const src = process.argv[2] || 'C:\\Users\\User\\.local\\share\\opencode\\tool-output\\tool_16ebf17dd001uQN6IpiHHLurgk';
 const md = fs.readFileSync(src, 'utf8');
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 
 // PvPoke 每型態: speciesName → { base, form, speciesId, dex }
 const master = gm.pokemon.map(p => {
@@ -57,5 +57,5 @@ const gmaxKeys = keys.filter(k => result[k].dmg);
 console.log('unique entries:', keys.length, '| G-Max species:', gmaxKeys.length);
 console.log('unmatched:', unmatched.length ? unmatched.join(', ') : '(none)');
 console.log('gmax:', gmaxKeys.join(' '));
-fs.writeFileSync('data_max.json', JSON.stringify(result, null, 1));
-console.log('wrote data_max.json');
+fs.writeFileSync('data/max.json', JSON.stringify(result, null, 1));
+console.log('wrote data/max.json');

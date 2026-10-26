@@ -2,7 +2,7 @@
  * fetch_go_gm.js — 下載 PokéMiners latest GAME_MASTER，抽出兩份小資料：
  *   1. PvE 招式數據（Vxxxx_MOVE_X.moveSettings：power/durationMs/energyDelta）
  *   2. 進化方向（pokemonSettings.evolutionBranch：物種 → 下游進化清單）
- * 輸出 data_go_gm.json（小檔），原始 19MB 大檔不保存。
+ * 輸出 data/go_gm.json（小檔），原始 19MB 大檔不保存。
  * 用法：node tools/fetch_go_gm.js
  */
 const fs = require('fs');
@@ -73,7 +73,7 @@ const fs = require('fs');
   }
 
   const out = { moves, evo };
-  fs.writeFileSync('data_go_gm.json', JSON.stringify(out));
+  fs.writeFileSync('data/go_gm.json', JSON.stringify(out));
   const hasFrenzy = moves.FRENZY_PLANT;
   console.log('PvE 招式:', Object.keys(moves).length,
     'FRENZY_PLANT:', JSON.stringify(hasFrenzy));

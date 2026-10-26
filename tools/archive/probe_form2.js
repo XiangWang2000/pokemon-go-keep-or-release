@@ -1,5 +1,5 @@
 const fs = require('fs');
-const gm = JSON.parse(fs.readFileSync('data_pokeminers_gm_raw.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pokeminers_gm_raw.json', 'utf8'));
 
 // 1) 正確模板名的伽勒爾蛇紋熊
 const zig = gm.find(t => t.templateId === 'V0263_POKEMON_ZIGZAGOON_GALARIAN');

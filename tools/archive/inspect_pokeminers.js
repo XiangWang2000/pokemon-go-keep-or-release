@@ -1,5 +1,5 @@
 const fs = require('fs');
-const gm = JSON.parse(fs.readFileSync('data_pokeminers_gm_raw.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pokeminers_gm_raw.json', 'utf8'));
 
 console.log('raw gamemaster entries:', gm.length);
 
@@ -9,7 +9,7 @@ console.log('player level template:', JSON.stringify(lvl, null, 1).slice(0, 600)
 const cpm = lvl?.data?.playerLevel?.cpMultiplier;
 if (cpm) {
   console.log('cpMultiplier length:', cpm.length, 'first:', cpm[0], 'L40:', cpm[39], 'L50:', cpm[49]);
-  fs.writeFileSync('data_cpm.json', JSON.stringify(cpm, null, 0));
+  fs.writeFileSync('data/cpm.json', JSON.stringify(cpm, null, 0));
 }
 
 // shiny availability template?

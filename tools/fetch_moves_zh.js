@@ -2,7 +2,7 @@
 const fs = require('fs');
 const https = require('https');
 
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 const moveIds = gm.moves.map(m => m.moveId.toLowerCase());
 console.log('moves to fetch:', moveIds.length);
 
@@ -35,7 +35,7 @@ function getJson(url) {
       fail.push(id + ':' + e.message);
     }
   }
-  fs.writeFileSync('data_moves_zh.json', JSON.stringify(out, null, 1));
+  fs.writeFileSync('data/moves_zh.json', JSON.stringify(out, null, 1));
   console.log('done. ok=' + ok, 'fail=' + fail.length);
   if (fail.length) console.log(fail.slice(0, 30).join('\n'));
 })();

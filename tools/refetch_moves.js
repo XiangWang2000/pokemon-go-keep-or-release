@@ -3,7 +3,7 @@
 const fs = require('fs');
 const https = require('https');
 
-const gm = JSON.parse(fs.readFileSync('data_pvpoke_gamemaster.json', 'utf8'));
+const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 const moveIds = gm.moves.map(m => m.moveId);
 console.log('moves to fetch:', moveIds.length);
 
@@ -39,7 +39,7 @@ function getJson(url, redirects = 0) {
       if (e.status === 404) notFound.push(id); else { fail.push(id); }
     }
   }
-  fs.writeFileSync('data_moves_zh.json', JSON.stringify(out, null, 1));
+  fs.writeFileSync('data/moves_zh.json', JSON.stringify(out, null, 1));
   console.log('ok=' + ok, 'notFound(404, 將由 build fallback)=' + notFound.length, 'empty=' + fail.length);
   if (notFound.length) console.log('404:', notFound.slice(0, 60).join(', '));
 })();
