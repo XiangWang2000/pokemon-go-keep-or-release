@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>寶可夢GO 去留指南</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=17">
+<link rel="stylesheet" href="css/style.css?v=18">
 </head>
 <body>
 <header>
@@ -58,14 +58,17 @@
       <option value="tier">排序：評級</option>
     </select>
   </div>
-  <div id="resultCount" aria-live="polite"></div>
+  <div class="cntrow">
+    <div id="resultCount" aria-live="polite"></div>
+    <button id="copyList" hidden title="把目前篩出的型態壓成遊戲搜尋字串（圖鑑編號，連續的以範圍 a-b 呈現，逗號＝OR）——貼進遊戲收藏的搜尋列即可一次篩出這批">📋 複製名單編號</button>
+  </div>
   <details id="guide">
     <summary>📖 新手指南：盒子滿了怎麼辦？／名詞小抄</summary>
     <div class="guidebody">
       <ol>
         <li><b>篩「評級＝可傳送」</b>：這些通常可以直接送，送前逐卡掃一眼標籤。</li>
         <li><b>不確定的點開卡片</b>：看「判定理由」和「接下來該做什麼」；暗影個體有現成的「淨化建議」。</li>
-        <li><b>標記</b>：詳細頁底按「標記這隻」會在 保留／可送／已送 間循環——卡片與清單列都會顯示標記，最後照「可送」一次處理。</li>
+        <li><b>標記</b>：詳細頁底按「標記這隻」會在 保留／可送／已送 間循環——卡片右上角會顯示標記角章，最後照「可送」一次處理。</li>
       </ol>
       <p><b>卡片右上角</b>＝<b>我的標記</b>（彩底角章）；<b>卡片左上角徽章</b>：<b>極</b>＝可參加極巨戰、<b>G·巨</b>＝可參加超極巨化戰、<b>超</b>＝有超級進化形態；頭像有紫光＝暗影。
       <br><b>卡片下方小字</b>：<code>CP · 聯盟名次 · PvE 前 X% · Max 前 X%</code>（有才顯示）——<code>#</code> 是名次、<b>愈小愈強</b>；<code>前 X%</code> 是強度排名、<b>數字愈小愈強</b>。</p>
@@ -98,6 +101,6 @@
   <div id="detailBody"></div>
 </aside>
 <div id="toast" role="status"></div>
-<script src="js/app.js?v=17"></script>
+<script src="js/app.js?v=18"></script>
 </body>
 </html>

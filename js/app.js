@@ -5,6 +5,7 @@ const LEAGUE_NAME = { 500: '小小盃', 1500: '超級聯盟', 2500: '高級聯�
 const TIER_NAME = ['必留', '建議保留', '看情況', '可傳送'];
 
 let DATA = null, FORMS = [], filtr = { search: '', tier: '', type: '', extra: '', gen: '', sort: 'dex' };
+let lastList = []; // render() 留下的「目前篩出型態」——複製名單編號用
 
 // 世代用全國圖鑑號區段判定（圖鑑號在 GO 沿用主系列，不隨形態變動）
 const GEN_RANGES = { 1: [1, 151], 2: [152, 251], 3: [252, 386], 4: [387, 493], 5: [494, 649], 6: [650, 721], 7: [722, 809], 8: [810, 905], 9: [906, 9999] };
@@ -181,7 +182,7 @@ function cardHtml(f) {
 function passFilter(f) {
   const s = filtr.search.toLowerCase();
   if (s) {
-    const megaTerm = ['超級進化', '原始回歸', 'mega'].some(t => filtr.search === t || filtr.search.includes(t)) || /mega|primal/.test(s);
+    const megaTerm = ['超級進化', '原始回歸', '超級', 'mega'].some(t => filtr.search === t || filtr.search.includes(t)) || /mega|primal/.test(s);
     if (!(f.zh.toLowerCase().includes(s) || f.en.toLowerCase().includes(s) || String(f.dex) === s || f.id.includes(s)
       || (megaTerm && f.megas))) return false;
   }
@@ -232,6 +233,13 @@ function render() {
   for (const k of Object.keys(marks)) if (mkCnt[marks[k]] !== undefined) mkCnt[marks[k]]++;
   const mkTotal = mkCnt.保留 + mkCnt.可送 + mkCnt.已送;
   if (mkTotal) cntLine += ` · 我的標記：${mkTotal} 隻（保留 ${mkCnt.保留}／可送 ${mkCnt.可送}／已送 ${mkCnt.已送}）`;
+  const copyBtn = document.getElementById('copyList');
+  if (copyBtn) {
+    // 「複製名單編號」只在有篩選時出現（沒篩選＝全量列表，對遊戲搜尋沒意義）
+    lastList = list;
+    const anyFilter = !!(filtr.tier || filtr.type || filtr.extra || filtr.gen || filtr.search);
+    copyBtn.hidden = !(anyFilter && list.length);
+  }
   $('#resultCount').textContent = cntLine;
 }
 
@@ -294,6 +302,7 @@ function openDetail(f) {
         '· 暗影加成與超級進化只能二選一：不缺暗影打手、常打超級進化戰的話，淨化較划算。</p>';
     }
     const footer = '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-size:11px;color:var(--muted)">' +
+      '暗影來源固定：只能跟火箭隊的寶可夢戰鬥並捕捉取得，無法由一般個體轉換。<br>' +
       '淨化是<b>單向</b>的；要花糖果與星塵（一般物種約 1 糖＋1000 星塵，實際以遊戲內顯示為準）。' +
       '<br><b>淨百規則：</b>淨化把個體值每項 +2（最高到 15）；原始攻／防／血都 13 以上的個體，淨化後即 15/15/15（淨百）。' +
       '可用下方「IV 排名計算機」輸入暗影個體值，預覽淨化後數值。</div>';
@@ -403,7 +412,7 @@ function openDetail(f) {
       <tr><td>最高 CP（Lv50 滿個體）</td><td>${f.cp50}</td></tr>
       ${(f.bulkPct >= 85) ? `<tr><td>守館體質</td><td>有效體質（HP×DEF）排行前 <b>${(100 - f.bulkPct).toFixed(1).replace(/\.0$/, '')}%</b>——能占守道館較久；但守館收益本來就低（金幣有上限／被淘汰就結束），只當參考指標</td></tr>` : ''}
       <tr><td>標籤</td><td>${tags.map(t => tagNames[t] || t).concat(f.dmg ? ['超極巨化'] : f.dm ? ['極巨化'] : []).join('、') || '一般'}</td></tr>
-      ${f.li ? '<tr><td></td><td>⚠ 超級聯盟禁入</td></tr>' : ''}
+      ${f.li ? '<tr><td></td><td>⚠ 超級聯盟禁入（PvPoke 列此形態在超級聯盟對戰不可使用，因此榜單不會有它的超級聯盟名次；其他聯盟不受影響）</td></tr>' : ''}
     </table>`)}
 
     ${fold(true, '招式與推薦帶法', null, `<div class="moves">${fast}${charged}</div>${recHtml}${maxBlock}`)}
@@ -496,6 +505,39 @@ $('#filterType').addEventListener('change', e => { filtr.type = e.target.value; 
 $('#filterExtra').addEventListener('change', e => { filtr.extra = e.target.value; saveFiltr(); render(); });
 $('#filterGen').addEventListener('change', e => { filtr.gen = e.target.value; saveFiltr(); render(); });
 $('#sortBy').addEventListener('change', e => { filtr.sort = e.target.value; saveFiltr(); render(); });
+
+/* ---------- Toast ＋ 複製名單編號 ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+// 複製目前篩出的型態 → 遊戲收藏搜尋字串：純數字＝圖鑑編號、連續編號壓成 a-b、逗號＝OR
+$('#copyList').addEventListener('click', () => {
+  const nums = [...new Set(lastList.map(f => f.dex))].sort((a, b) => a - b);
+  const parts = [];
+  for (let i = 0; i < nums.length;) {
+    let j = i;
+    while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+    parts.push(nums[i] === nums[j] ? String(nums[i]) : nums[i] + 1 === nums[j] ? nums[i] + ',' + nums[j] : nums[i] + '-' + nums[j]);
+    i = j + 1;
+  }
+  const s = parts.join(',');
+  const copyText = navigator.clipboard && navigator.clipboard.writeText
+    ? navigator.clipboard.writeText(s)
+    : new Promise((res, rej) => {
+      const ta = document.createElement('textarea');
+      ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy') ? res() : rej(new Error('execCommand')); } catch (e) { rej(e); }
+      ta.remove();
+    });
+  copyText.then(() => toast(`已複製 ${nums.length} 個編號——貼進遊戲收藏的搜尋列即可一次篩出`))
+    .catch(() => toast('複製失敗：瀏覽器不允許存取剪貼簿'));
+});
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
 {
   const btn = $('#imgStyle');
@@ -536,7 +578,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=17').then(r => {
+fetch('data/data.json?v=18').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
