@@ -175,6 +175,12 @@ const ranks = {
 const LEAGUES = [500, 1500, 2500, 10000];
 const LEAGUE_ZH = { 500: '小小盃', 1500: '超級聯盟', 2500: '高級聯盟', 10000: '大師聯盟' };
 
+// 單屬性絕活攻打手例外：PvE 估算走全物種單榜百分位，「單一屬性的頂尖打手」吃不到
+// 屬性優勢會被低估（回報案例：戰槌龍岩石 DPS 頂尖卻 pct 66.8 → 被判可傳送）。
+// 逐一認定，來源：GO Hub best-per-type top20 × 本站 tier3 系統性交叉掃描（2026-10）；
+// 掃描為零遮蔽（其他型態皆已在 tier0－2）。待「PvE 屬性分榜」主管線實做後整批取代。
+const PVE_TYPE_STARS = { rampardos: '岩石', glimmora: '岩石', meowscarada: '草', hatterene: '妖精' };
+
 // ---------- 盃賽／特殊格式排行（限制盃人選查詢用） ----------
 let cupData = null;
 try { cupData = JSON.parse(fs.readFileSync('data/cup_rankings.json', 'utf8')); } catch (e) { console.log('(cup rankings not ready yet)'); }
@@ -709,6 +715,11 @@ function judge(e) {
       tier = 2;
       reasons.push(LEAGUE_ZH[b.L] + '排行第 ' + b.r + ' 名：中段戰力——非必練，可做該聯盟替補或限制盃（小小盃等）人選，隊伍缺類型時保留');
       if (e.cupR && e.cupR[0] && e.cupR[0][1] <= 150) reasons.push('限制盃加分：在 ' + cupMeta[e.cupR[0][0]].zh + ' 排行第 ' + e.cupR[0][1] + ' 名');
+    } else if (PVE_TYPE_STARS[e.id.replace(/_shadow$/, '')]) {
+      // 單屬性絕活打手（暗影版同物種一併比照）：全物種單榜吃不到屬性優勢，別直接送
+      const tzh = PVE_TYPE_STARS[e.id.replace(/_shadow$/, '')];
+      tier = 2;
+      reasons.push(tzh + '屬性招牌攻打手：本站 PvE 估算按全物種單榜取百分位（不分屬性），會低估單屬性絕活——缺' + tzh + '打手時保留，別直接送');
     } else {
       tier = 3;
       reasons.push('對戰排行與 PvE 估算皆低：可以傳送換糖果');
