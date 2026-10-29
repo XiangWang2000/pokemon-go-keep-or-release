@@ -578,7 +578,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=18').then(r => {
+fetch('data/data.json?v=19').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
