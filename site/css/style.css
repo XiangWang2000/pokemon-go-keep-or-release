@@ -140,6 +140,9 @@ h1 .sub { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8
 #guide .gloss li { padding: 3px 0; border-bottom: 1px dashed var(--line); }
 @media (max-width: 640px) { #guide .gloss { grid-template-columns: 1fr; } }
 
+/* 手機／200% 縮放等高倍率窄視口：解除頁首 sticky，避免高大的導覽列壓住卡片 */
+@media (max-width: 900px) { header { position: static; } }
+
 /* ---------- 詳細面板（唯一送出的動效時刻：右側滑入 220ms） ---------- */
 #detail {
   position: fixed; top: 0; right: 0; width: min(430px, 96vw); height: 100%;
