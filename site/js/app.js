@@ -433,7 +433,19 @@ function openDetail(f) {
     else if (cur === '保留') marks[f.id] = '可送';
     else if (cur === '可送') marks[f.id] = '已送';
     else delete marks[f.id];
-    saveMarks(); render(); openDetail(f); // render 讓卡片角章與統計行即時更新
+    saveMarks();
+    // 保全面板狀態：標記重建面板時，IV 計算機輸入與折疊開合不歸零
+    const $id = id => document.getElementById(id);
+    const keep = { a: $id('ivA') && $id('ivA').value, d: $id('ivD') && $id('ivD').value,
+      h: $id('ivH') && $id('ivH').value, lg: $id('ivLeague') && $id('ivLeague').value,
+      folds: [...document.querySelectorAll('#detail details.fold')].map(d => d.open) };
+    render(); openDetail(f); // render 讓卡片角章與統計行即時更新
+    if (keep.a !== null && $id('ivA')) {
+      $id('ivA').value = keep.a; $id('ivD').value = keep.d; $id('ivH').value = keep.h;
+      if (keep.lg) $id('ivLeague').value = keep.lg;
+      [...document.querySelectorAll('#detail details.fold')].forEach((d, i) => { if (i < keep.folds.length) d.open = keep.folds[i]; });
+      runIvCalc(); // 回填後重跑，結果與輸入一致
+    }
   };
 }
 function closeDetail() {
@@ -569,7 +581,11 @@ $('#copyList').addEventListener('click', () => {
 }
 grid.addEventListener('click', e => {
   const card = e.target.closest('.card');
-  if (!card) return;
+  if (!card) {
+    // 點格子的空白處＝關詳細面板（空白要「點旁邊就關」，不是無反應）
+    if (!$('#detail').classList.contains('hidden')) closeDetail();
+    return;
+  }
   const f = FORMS.find(x => x.id === card.dataset.id);
   if (f) openDetail(f);
 });

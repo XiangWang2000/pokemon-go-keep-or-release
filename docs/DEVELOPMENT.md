@@ -223,6 +223,19 @@ git subtree push --prefix site origin gh-pages
 # gh-pages 是單向部署產物內容，強推不會帶走站上歷史（Pages 只讀最新 tree）。
 ```
 
+部署卡障排查（2026-11-01 實戰）：GitHub Pages 已知會出現「前一部署永遠 in
+progress」的佇列卡死，接連擋掉後續建置（Actions 的 pages-build-deployment
+顯示 `due to in progress deployment. Please cancel <sha> first`）。解卡：
+
+```powershell
+# 找出卡住的部署 id（error 訊息的 sha 對應者）
+gh api repos/XiangWang2000/pokemon-go-keep-or-release/deployments?environment=github-pages --jq ".[] | select(.sha | startswith(\"<卡住的sha前8碼>\")) | .id"
+# 先標 inactive，再 DELETE 該部署物件，最後推一個提交重觸發建置
+gh api -X POST repos/XiangWang2000/pokemon-go-keep-or-release/deployments/<id>/statuses -f state=inactive -f description="cancel stalled" -f environment=github-pages
+gh api -X DELETE repos/XiangWang2000/pokemon-go-keep-or-release/deployments/<id>
+$tree = git rev-parse "origin/gh-pages^{tree}"; $c = git -c user.name="XiangWang2000" -c user.email="XiangWang2000@users.noreply.github.com" commit-tree $tree -p origin/gh-pages -m "chore：重觸發 Pages 建置"; git push origin "${c}:refs/heads/gh-pages"
+```
+
 `site/.nojekyll` 避免 GitHub Pages 跑 Jekyll 處理。
 
 ## 整理歷史
