@@ -506,6 +506,21 @@ $('#filterExtra').addEventListener('change', e => { filtr.extra = e.target.value
 $('#filterGen').addEventListener('change', e => { filtr.gen = e.target.value; saveFiltr(); render(); });
 $('#sortBy').addEventListener('change', e => { filtr.sort = e.target.value; saveFiltr(); render(); });
 
+/* ---------- 回到最上方 ---------- */
+const toTop = document.getElementById('toTop');
+window.addEventListener('scroll', () => {
+  if (!toTop) return;
+  const show = window.scrollY > 600;
+  toTop.hidden = false; // CSS 以 opacity 過場；hidden 只在初始佔位前隱藏
+  toTop.classList.toggle('show', show);
+}, { passive: true });
+if (toTop) {
+  toTop.addEventListener('click', () => {
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+  });
+}
+
 /* ---------- Toast ＋ 複製名單編號 ---------- */
 let toastTimer;
 function toast(msg) {
