@@ -1,0 +1,16 @@
+{
+  "name": "pokemon_opensourcemodel",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "node tools/build_data.js",
+    "audit": "node tools/audit_data.js",
+    "test": "node tools/audit_data.js"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "opencc-js": "^1.4.2"
+  }
+}
