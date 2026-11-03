@@ -229,6 +229,10 @@ git subtree push --prefix site origin gh-pages
 #   $h = git subtree split --prefix site | Select-Object -Last 1
 #   git push --force origin "${h}:refs/heads/gh-pages"
 # gh-pages 是單向部署產物內容，強推不會帶走站上歷史（Pages 只讀最新 tree）。
+# 清理（適量）：舊的部署物件與 Actions 紀錄可以逐筆刪掉，只留目前線上那版——
+#   gh api repos/XiangWang2000/pokemon-go-keep-or-release/deployments   （列出 id，DELETE /deployments/<id>）
+#   gh api -X DELETE repos/XiangWang2000/pokemon-go-keep-or-release/actions/runs/<run_id>
+# 刪部署物件前需先 POST state=inactive；不影響線上服務（Pages 只認最新 gh-pages tree）。
 ```
 
 部署卡障排查（2026-11-01 實戰）：GitHub Pages 已知會出現「前一部署永遠 in
