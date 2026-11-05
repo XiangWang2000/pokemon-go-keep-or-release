@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "node tools/build_data.js",
-    "audit": "node tools/audit_data.js",
-    "test": "node tools/audit_data.js"
+    "test": "node tools/test_core.js && node tools/audit_data.js",
+    "audit": "node tools/audit_data.js"
   },
   "keywords": [],
   "type": "commonjs",

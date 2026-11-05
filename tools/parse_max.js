@@ -1,9 +1,17 @@
 // parse_max.js — 從 pokemondb dynamax-attackers 頁 markdown 解析 D-Max / G-Max 物種清單
 // 對照源直接用 PvPoke gamemaster（speciesName/speciesId 為唯一權威鍵）
-// 輸出: data/max.json = { "<speciesId>": { dm: true, dmg: true, name, form } }
+// 輸出: data/max.json = { "<speciesId>": { dm: true, dmg: true, name, form } } + fetched 撈取日
+// 用法: node tools/parse_max.js [頁面檔案] —— 預設讀 data/_max_db.md
+//       （先另存 pokemondb.net/go/dynamax-attackers 成 .md；檔案不存在時列出取得說明後中止）
 const fs = require('fs');
 
-const src = process.argv[2] || 'C:\\Users\\User\\.local\\share\\opencode\\tool-output\\tool_16ebf17dd001uQN6IpiHHLurgk';
+const src = process.argv[2] || 'data/_max_db.md';
+if (!fs.existsSync(src)) {
+  console.error('找不到來源檔 ' + src + '\n' +
+    '請先另存 https://pokemondb.net/go/dynamax-attackers 頁面（markdown/HTML 皆可）為 ' + src + '，\n' +
+    '或用參數指明路徑：node tools/parse_max.js C:\\path\\to\\saved.md');
+  process.exit(1);
+}
 const md = fs.readFileSync(src, 'utf8');
 const gm = JSON.parse(fs.readFileSync('data/pvpoke_gamemaster.json', 'utf8'));
 
@@ -41,7 +49,7 @@ function matchMaster(dbName) {
 }
 
 const seen = new Set();
-const result = {};
+const result = { fetched: new Date().toISOString().slice(0, 10) };
 const unmatched = [];
 for (const raw of md.split('\n')) {
   const m = raw.match(/^\|\s*!\[([^\]]+)\]\([^)]*\)\s*\|\s*(Dynamax|Gigantamax)\s+(.+?)\s+\[/i);
@@ -52,7 +60,7 @@ for (const raw of md.split('\n')) {
   if (!hit) { unmatched.push(m[1]); continue; }
   if (!result[hit.id]) result[hit.id] = { dm: true, dmg: /gigantamax/i.test(m[2]), name: hit.base, species: hit.id };
 }
-const keys = Object.keys(result);
+const keys = Object.keys(result).filter(k => k !== 'fetched');
 const gmaxKeys = keys.filter(k => result[k].dmg);
 console.log('unique entries:', keys.length, '| G-Max species:', gmaxKeys.length);
 console.log('unmatched:', unmatched.length ? unmatched.join(', ') : '(none)');
