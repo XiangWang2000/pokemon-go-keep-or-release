@@ -299,3 +299,31 @@ html { scroll-behavior: smooth; }
 #toTop.show { opacity: 1; transform: none; pointer-events: auto; }
 #toTop:hover { border-color: var(--accent); }
 #toTop:active { transform: translateY(1px); }
+
+/* ---------- 混形態警告視窗（H07） ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center;
+  background: rgba(10, 10, 20, .55);
+  padding: 16px;
+  margin: 0;
+}
+.modal.hidden { display: none; }
+.modalbox {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  max-width: 460px; width: 100%;
+  max-height: 80vh; overflow: auto;
+  padding: 18px 18px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+}
+.modalbox h2 { font-size: 16px; margin: 0 0 10px; }
+.modalbox button {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel2); color: var(--text);
+  font-weight: 600; cursor: pointer;
+}
+.modal table.stats td:last-child { text-align: left; color: var(--text); }

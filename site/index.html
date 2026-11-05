@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>寶可夢GO 去留指南</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=cd4ad2a836">
+<link rel="stylesheet" href="css/style.css?v=ec67425da6">
 </head>
 <body>
 <header>
@@ -79,7 +79,7 @@
       <li><b>PvE</b>＝打道館／團體戰</li>
       <li><b>DPS</b>＝每秒輸出傷害</li>
       <li><b>循環 DPS</b>＝快招＋蓄力招輪轉的平均每秒傷害</li>
-      <li><b>IV／個體值</b>＝天生素質（攻／防／血各 0–15），後天改不了、淨化可 +2</li>
+      <li><b>IV／個體值</b>＝天生素質（攻／防／血各 0–15）；可由淨化 +2，或用瓶蓋訓練補（銀色瓶蓋練單一項、金色瓶蓋練全部；需 Good Buddy 等級、暗影須先淨化、365 天內完成任務）</li>
       <li><b>種族值</b>＝物種天生的基礎數值（同物種每隻相同）</li>
       <li><b>STAB／屬性一致</b>＝招式屬性與自身相同時傷害 ×1.2</li>
       <li><b>meta</b>＝現行環境的主流強度</li>
@@ -100,8 +100,17 @@
   <button id="closeDetail" aria-label="關閉詳細資訊">✕</button>
   <div id="detailBody"></div>
 </aside>
+<!-- H07：複製名單含混合形態編號時的強制警告（遊戲搜尋會一次選中同編號全部形態） -->
+<div id="mixWarn" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="mixWarnTitle" aria-describedby="mixWarnBody">
+  <div class="modalbox" role="document">
+    <h2 id="mixWarnTitle">⚠ 同編號混有不同形態——不可用編號全選傳送</h2>
+    <div id="mixWarnBody"></div>
+    <button id="mixWarnClose" aria-label="關閉警告">我知道了，關閉</button>
+  </div>
+</div>
 <div id="toast" role="status"></div>
 <button id="toTop" hidden aria-label="回到最上方" title="回到最上方（篩選列）">▲</button>
-<script src="js/app.js?v=2f07bc9166"></script>
+<script src="js/core.js?v=dc201f81ea"></script>
+<script src="js/app.js?v=245023b4c8"></script>
 </body>
 </html>
