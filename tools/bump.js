@@ -9,7 +9,14 @@ const path = require('path');
 const crypto = require('crypto');
 
 const site = path.join(__dirname, '..', 'site');
-const hashFile = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex').slice(0, 10);
+// R01：hash 前先把內容正規化（去 BOM、CRLF→LF）——同一份檔案在 Windows（工作區 CRLF）
+// 與 Linux CI（checkout 後 LF）必須算出同一個 hash，否則 bump 不冪等、CI 一定炸
+const hashFile = f => {
+  let s = fs.readFileSync(f, 'utf8');
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return crypto.createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 10);
+};
 
 const cssPath = path.join(site, 'css', 'style.css');
 const corePath = path.join(site, 'js', 'core.js');

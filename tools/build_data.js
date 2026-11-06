@@ -21,6 +21,7 @@ const REQUIRED_SOURCES = [
   'data/pvpoke_500.json', 'data/pvpoke_1500.json', 'data/pvpoke_2500.json', 'data/pvpoke_10000.json',
   'data/names_zh_hant.json', 'data/go_names_zhtw.json', 'data/cpm.json',
   'data/go_gm.json', 'data/max.json', 'data/uicons_filelist.json', 'data/wwm_reactmap.json',
+  'data/cup_rankings.json', // R12：限制盃排行榜直接影響評級（「限制盃人選」）→ 缺檔不再降級為警告，直接中止
 ];
 {
   const missing = REQUIRED_SOURCES.filter(f => !fs.existsSync(f) || fs.statSync(f).size < 5);
@@ -39,8 +40,9 @@ if (!goGm.moves || !Object.keys(goGm.moves).length) {
   process.exit(1);
 }
 if (!goGm.maxMoves || !Object.keys(goGm.maxMoves).length) {
-  console.log('警告：go_gm.json 缺極巨招式（VN_BM_*）——G-Max 專屬屬性將退回快招近似');
-  metaIncomplete.push('go_gm.maxMoves 缺失，G-Max 專屬招式屬性以快招近似');
+  // R12：G-Max／專屬 Max 招式屬性直接影響 dmx 估算與評級 → 缺失不再只進 meta.incomplete
+  console.error('❌ data/go_gm.json 缺極巨招式（VN_BM_*）——重新跑 node tools/fetch_go_gm.js');
+  process.exit(1);
 }
 
 // 排除：主題造型物種（個人品項無法量化，不列入清單）
@@ -204,10 +206,21 @@ const LEAGUE_ZH = { 500: '小小盃', 1500: '超級聯盟', 2500: '高級聯盟'
 // 不再需要人工列名單（舊例 rampardos / glimmora / meowscarada / hatterene 由榜單自然覆蓋）。
 
 // ---------- 盃賽／特殊格式排行（限制盃人選查詢用） ----------
+// R09：盃賽榜是「現行季」資料（抓取日記在 fetched）——超過 45 天（約半個 GBL 賽季）
+// 就不再默默參與主評級（「限制盃人選」升級／NFE 盃前 10 保護關閉），只保留榜單當註記
 let cupData = null;
 try { cupData = JSON.parse(fs.readFileSync('data/cup_rankings.json', 'utf8')); } catch (e) {
   console.log('(cup rankings not ready yet)');
-  metaIncomplete.push('data/cup_rankings.json 缺失——限制盃人選／小小盃次級註記以現況為準（node tools/fetch_cup_rankings.js 補抓）');
+}
+const CUP_FRESH_DAYS = 45;
+let cupStale = false;
+if (cupData && cupData.fetched) {
+  const age = Math.round((Date.now() - new Date(cupData.fetched).getTime()) / 86400000);
+  if (age > CUP_FRESH_DAYS) {
+    cupStale = true;
+    console.log(`⚠️ 盃賽榜已 ${age} 天未重抓（>${CUP_FRESH_DAYS} 天）——本建置不把它當現行榜影響評級：限制盃升級／NFE 盃前 10 保護關閉（node tools/fetch_cup_rankings.js 重抓）`);
+    metaIncomplete.push(`盃賽榜過期 ${age} 天（>45 天）——已停用「限制盃人選」評級升級，只留榜單註記`);
+  }
 }
 const cupIndexMap = {};
 const cupMeta = [];
@@ -369,6 +382,8 @@ function pveCalc(p) {
     const fStab = stag(getGoMove(fc.id).type);
     for (const c of charged) {
       const cType = getGoMove(c.id).type;
+      if (cType === 'normal') continue; // R05：普通屬性對任何屬性都沒有效果絕佳——×1.6 弱點分榜不成立
+                                        // （一般屬性打手的強度由全域單榜以中性評價，不作屬性絕活保護）
       const cStab = stag(cType);
       const cyc = CORE.pveCycle(fc, c, fStab, cStab);
       if (cyc == null) continue;
@@ -425,30 +440,39 @@ const MAX_GMAX_MOVE = {
   toxtricity_amped: 'gmax_stun_shock', toxtricity_low_key: 'gmax_stun_shock',
   grimmsnarl: 'gmax_snooze',
 };
+// R06：蒼響／藏瑪然特＝真 Dynamax（非超極巨）、Max 招式為「專屬鋼屬招式」且威力是
+// D-Max 級 250/300/350（2026-11-05 核實：PokéBase／Pokétory Max 技能表；GM vfx 已實錄）——
+// 不能用「快招屬性」的一般極巨攻擊規則建模
+const MAX_FIXED_MOVE = {
+  zacian_crowned_sword: 'max_behemoth_blade',
+  zamazenta_crowned_shield: 'max_behemoth_bash',
+};
 const dmxMissingGmax = [];
-function dmxCalc(p, dmg, specialMax) {
+// R02：拆行後逐行呼叫——mode 參數決定威力級與屬性來源：
+//   dmg＝G-Max（威力級 450＋MAX_GMAX_MOVE 專屬招式）；fixedVfx＝R06 專屬招式（D-Max 級 350）；
+//   兩者皆無＝一般 D-Max（威力級 350、屬性＝快招屬性、逐快招取最佳）
+function dmxCalc(p, dmg, fixedVfx) {
   const atkStat = (p.baseStats.atk + 15) * CPM_L40;
   const stag = t => (p.types && p.types.includes(t)) ? 1.2 : 1.0;
   const fastRaw = (p.fastMoves || []).map(id => ({ id, m: getGoMove(id) }))
     .filter(x => x.m && x.m.power > 0 && x.m.energyDelta > 0);
   if (!fastRaw.length) return null;
-  // G-Max／無極汰那：專屬招式（威力 G-Max 級 450）
-  if (dmg || specialMax) {
-    const vfx = specialMax ? 'max_dynamax_cannon' : MAX_GMAX_MOVE[p.speciesId];
+  if (fixedVfx || dmg) {
+    const vfx = fixedVfx || MAX_GMAX_MOVE[p.speciesId];
     const mm = vfx && goGm.maxMoves && goGm.maxMoves[vfx];
     if (!mm) { dmxMissingGmax.push(p.speciesId); return null; }
     const dur = Math.min(...fastRaw.map(x => x.m.durationMs)) / 1000;
-    const rate = CORE.maxRate({ power: 450, multiplier: stag(mm.type), atkStat, fastDurSec: dur });
-    return { dps: +rate.toFixed(2), tp: mm.type };
+    const rate = CORE.maxRate({ power: fixedVfx ? 350 : 450, multiplier: stag(mm.type), atkStat, fastDurSec: dur });
+    return { dps: +rate.toFixed(2), tp: mm.type, fixed: fixedVfx ? true : undefined };
   }
-  // D-Max：極巨攻擊屬性＝快招屬性 → 逐一快招取最佳（威力 L3 350）
+  // 一般 D-Max：極巨攻擊屬性＝快招屬性 → 逐一快招取最佳（威力 L3 350）
   let best = null;
   for (const fm of fastRaw) {
     const dur = fm.m.durationMs / 1000;
     const rate = CORE.maxRate({ power: 350, multiplier: stag(fm.m.type), atkStat, fastDurSec: dur });
-    if (!best || rate > best.dps) best = { dps: rate, tp: fm.m.type };
+    if (!best || rate > best.rate) best = { rate, tp: fm.m.type };
   }
-  return { dps: +best.dps.toFixed(2), tp: best.tp };
+  return { dps: +best.rate.toFixed(2), tp: best.tp };
 }
 
 // ---------- 建立型態清單 ----------
@@ -528,13 +552,17 @@ for (const p of gm.pokemon) {
   //   單次可捕）且擁有專屬 Max 招式 Dynamax Cannon（龍屬、G-Max 威力級）→ 補標，
   //   並與蒼響／藏瑪然特／武道熊師同類（本體即極巨化，不拆行）
   const MAX_EXTRA = new Set(['melmetal']);
+  // MAX_SPECIAL：無極汰那不在 pokemondb 清單——由 GO Pass 期間限定取得（Max Finale 2025-08 首發、
+  // Dynamax Trails 2026-11 回歸可再捕），且本體即極巨化個體（無一般個體）→ 補標 dm。
+  // R07 核實：無極汰那是「一般 Dynamax」能力（極巨攻擊屬性=快招屬性，與其他 D-Max 相同）；
+  // 專屬的 Dynamax Cannon 是「蓄力招」＋場外冒險效果（Max 招全隊 +1 級），不是專屬 Max 招式。
   const MAX_SPECIAL = new Set(['eternatus']);
   if (maxData) {
     const mx = maxData[p.speciesId] || (MAX_EXTRA.has(p.speciesId) || MAX_SPECIAL.has(p.speciesId) ? {} : null);
     if (mx) {
       entry.dm = true;
-      entry.dmx = dmxCalc(p, !!mx.dmg, MAX_SPECIAL.has(p.speciesId));
       if (mx.dmg) entry.dmg = true;
+      // R02：dmx 不在此計算——拆行（G-Max／D-Max 分行）後逐行重算，威力級與屬性各對各
     }
   }
   all.push(entry);
@@ -588,7 +616,6 @@ if (maxData) {
     d.icon = (uiconsFiles && uiconsFiles.has(e.dex + '_b1.png')) ? e.dex + '_b1.png' : e.icon;
     dmaxExtra.push(d);
     delete e.dm; // 一般個體另以標記判斷，不再帶能力資訊
-    delete e.dmx; // 一般個體不能極巨化，估算一併移除（d 副本已繼承 dmx）
   }
   all.push(...dmaxExtra);
   console.log('極巨化獨立型態:', dmaxExtra.length);
@@ -633,18 +660,37 @@ for (const e of all) {
   console.log('PvE 屬性分榜:', Object.keys(sorted).length, '個屬性；母體', pveWeightPool.length, '型態');
 }
 
-// ---------- 極巨戰攻擊百分位 ----------
-// 分布＝全部可極巨化／超極巨化行（攻手池內的相對位置）
-if (all.some(e => e.dmx)) {
-  const dw = all.filter(e => e.dmx && e.dmx.dps > 0).map(e => e.dmx.dps).sort((a, b) => a - b);
-  for (const e of all) {
-    if (!e.dmx) continue;
-    e.dmx.pct = pctOf(dw, e.dmx.dps);
+// ---------- 極巨戰攻擊估算（R02：拆行後逐行重算） ----------
+// 放在 G-Max／D-Max 拆行與超進化合併之後：每行只拿「屬於自己」的威力級與屬性來源——
+//   _gmax 行＝G-Max 級 450＋專屬招式屬性（MAX_GMAX_MOVE）；蒼響／藏瑪然特＝R06 專屬鋼屬（350）；
+//   其餘可極巨化行＝一般 D-Max 級 350＋快招屬性。舊版在拆行前只算一次，
+//   G-Max 物種的 _dmax 拆分行會錯拿 450／專屬屬性（噴火龍／妙蛙花等）。
+{
+  const gmById = new Map(gm.pokemon.map(p => [p.speciesId, p]));
+  const dmxRows = all.filter(e => e.dm || e.dmg);
+  for (const e of dmxRows) {
+    const baseId = e.id.replace(/_(gmax|dmax)$/, '');
+    const p = gmById.get(baseId);
+    if (!p) { dmxMissingGmax.push(e.id + '(找不到物種定義)'); continue; }
+    const fixed = MAX_FIXED_MOVE[baseId];
+    e.dmx = dmxCalc(p, !!e.dmg, fixed);
+    if (e.dmx && e.dm && !e.dmg && !fixed) e.dmx.mode = 'dmax';       // 一般 D-Max（快招屬性）
+    else if (e.dmx && (e.dmg || fixed)) e.dmx.mode = 'gmax';          // G-Max 級／蒼響藏瑪然特專屬招式
   }
+  if (all.some(e => e.dmx)) {
+    const dw = all.filter(e => e.dmx && e.dmx.dps > 0).map(e => e.dmx.dps).sort((a, b) => a - b);
+    for (const e of all) {
+      if (!e.dmx) continue;
+      e.dmx.pct = pctOf(dw, e.dmx.dps);
+    }
+  }
+  console.log('極巨攻擊估算:', dmxRows.filter(e => e.dmx).length, '行（G-Max 級',
+    dmxRows.filter(e => e.dmg).length, '行）');
 }
 if (dmxMissingGmax.length) {
-  console.log('❌ G-Max 專屬招式映射失敗:', dmxMissingGmax.join(' '));
-  metaIncomplete.push('G-Max 專屬招式映射缺漏: ' + dmxMissingGmax.join(','));
+  // R12：G-Max／專屬 Max 招式映射失敗＝dmx 資料不正確 → 不再只警告，中止建置
+  console.log('❌ 專屬 Max 招式映射失敗:', dmxMissingGmax.join(' '));
+  process.exit(1);
 }
 
 // ---------- 有效體質（守道館指標 bulkPct） ----------
@@ -683,6 +729,18 @@ function bestStd(e) {
     if (r && (r < (!best ? Infinity : best.r))) best = { r, L };
   }
   return best;
+}
+// L04：暗影高價值保護（與 tools/audit_data.js 的反向稽核同一規則，保持一致）——
+// 暗影取得的機會跟著火箭隊輪替走、斷了就難再捕，因此價值判斷必須看**全部**聯盟
+// （含 500 CP 小小盃）；任一聯盟名次前 150／PvE 估算前 10%／任一屬性分榜前 5% 的暗影
+// 不得判「可傳送」。連坐降級（NFE 進化線一致性）也必須先過這道保護。
+function shadowValuable(e) {
+  if (!(e.tags || []).includes('shadow')) return false;
+  const bestPvP = [500, 1500, 2500, 10000].map(L => e.pvp[L] && e.pvp[L].r)
+    .filter(v => Number.isFinite(v)).sort((a, b) => a - b)[0];
+  const tpVals = e.pve && e.pve.tp ? Object.values(e.pve.tp).filter(v => Number.isFinite(v)) : [];
+  const tpTop = tpVals.length ? Math.max(...tpVals) : null; // 「任一屬性很強」＝最大值（R04）
+  return (bestPvP != null && bestPvP <= 150) || (e.pve && e.pve.pct >= 90) || (tpTop != null && tpTop >= 95);
 }
 // ---------- 超級進化／原始回歸 併回母體型態 ----------
 // 超級進化是「物種開放、個體自由進行」的機制：母體資訊已涵蓋判定，
@@ -776,11 +834,15 @@ function judge(e) {
     tier = 0;
     reasons.push('幻獸：來源稀少且無法交換，重複的也建議留著換 XL 糖果');
   } else if (e.id === 'eternatus') {
-    // 無極汰那：GO Pass 限定、單次取得（2026-11 事件核實），重複品無法再取得；
-    // 專屬 Max 招式 Dynamax Cannon 屬 G-Max 威力級（450），可極巨戰頂尖輸出
-    tier = 0;
-    reasons.push('無極汰那：GO Pass 活動限定單次取得，錯過無法再捕；專屬極巨招式 Dynamax Cannon 為 G-Max 威力級，Max Battle 頂尖輸出——必留');
-    rankReason(10000, 50) || rankReason(2500, 50);
+    // 無極汰那（R07，2026-11-05 核實：Niantic 官方 Dynamax Trails 公告＋PokeMiners GM）：
+    // GO Pass 期間限定取得（Max Finale 2025-08 首發；Dynamax Trails 2026-11 起回歸、每次活動限一隻）；
+    // 具「一般 Dynamax」能力（極巨攻擊＝快招屬性的常規規則，非專屬 G-Max 招式）；
+    // 專屬的是「蓄力招」Dynamax Cannon（GM power 215／耗能 100）＋場外冒險效果——
+    // 舊版「專屬 Max 招式屬 G-Max 威力級（450）」的說法有誤，已修正
+    tier = 1;
+    reasons.push('傳說寶可夢：GO Pass 活動期間限定、每次活動單隻（2025-08 Max Finale 首發；2026-11 Dynamax Trails 回歸可再捕）——活動期間取得的所有個體都建議保留');
+    reasons.push('Dynamax Cannon（龍屬蓄力招）另有場外冒險效果：Max 招式全隊升 1 級 10 分鐘（5,000 星塵＋30 糖）；極巨戰中的極巨攻擊本身仍是快招屬性的一般極巨攻擊');
+    rankReason(10000, 100) || rankReason(2500, 100);
   } else if (e.megas) {
     tier = 0;
     const kinds = e.megas.some(m => m.isPrimal) ? '原始回歸' : '超級進化';
@@ -816,7 +878,8 @@ function judge(e) {
     }
   } else {
     // 一般型態
-    const cupHit = e.cupR && e.cupR[0] && e.cupR[0][1] <= 50;
+    // R09：盃賽榜過期（>45 天）不得默默參與主評級——「限制盃人選」升級停用，只保留榜單註記
+    const cupHit = !cupStale && e.cupR && e.cupR[0] && e.cupR[0][1] <= 50;
     const star = pveStar(e);
     if (star) {
       tier = 0;
@@ -841,7 +904,7 @@ function judge(e) {
       reasons.push('區域限定：至少留一隻做收藏');
     } else if (e.nfe) {
       // 未完全進化：看進化後要不要留；但自身名次夠硬 → 進化前型態自己就是戰力
-      const cupTop10 = e.cupR && e.cupR[0] && e.cupR[0][1] <= 10;
+      const cupTop10 = !cupStale && e.cupR && e.cupR[0] && e.cupR[0][1] <= 10;
       if ((b && b.r <= 60) || cupTop10) {
         tier = 1;
         reasons.push('進化前型態自身強勢：' + (cupTop10
@@ -860,6 +923,10 @@ function judge(e) {
       // （攻高皮薄的新寶夢龍、屬性絕活暗影等），一律不得判「可傳送」
       tier = 2;
       reasons.push('屬性分榜前 10%：單屬性絕活打手（全物種單榜未反映屬性優勢）——缺該屬性打手時有意思，別直接送');
+    } else if (shadowValuable(e)) {
+      // L04：暗影高價值保護（小小盃 500 名次也計入）——與 audit 反向稽核同一規則
+      tier = 1;
+      reasons.push('高價值暗影：任一聯盟（含 500 CP 賽制）排行前 150 名——暗影隨火箭隊輪替取得、失去難再得，不建議送');
     } else {
       tier = 3;
       reasons.push('對戰排行與 PvE 估算皆低：可以傳送換糖果');
@@ -960,8 +1027,9 @@ for (const e of all) {
       if (lineIndep(e)) continue; // 區域/傳說等：理由非進化線，保留原判
       // H06 保護：自身名次夠硬的 NFE 不連坐——名次含 500 CP 格式總榜（暗影初心型態如
       // carvanha_shadow／psyduck_shadow 常只有 500 榜名次，且暗影再取得不易），現行盃 top10 也是
+      // L04：暗影另過 shadowValuable 保護（任一聯盟前 150／PvE 前 10%／屬性分榜前 5%）
       const bnAll = bestRank(e);
-      if ((bnAll && bnAll.r <= 150) || (e.cupR && e.cupR[0] && e.cupR[0][1] <= 10)) continue;
+      if ((bnAll && bnAll.r <= 150) || (!cupStale && e.cupR && e.cupR[0] && e.cupR[0][1] <= 10) || shadowValuable(e)) continue;
       const ends = reachable(e, new Set());
       if (!ends.length) continue;               // 進化後型態未實裝 → 保守不動
       if (Math.min(...ends.map(x => x.verdict.tier)) !== 3) continue;

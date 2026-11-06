@@ -155,3 +155,103 @@ IV 計算機上方加明示：「這臺計算機衡量『你手上這隻個體�
 5. **L09 手機實機與全量 a11y 實測**未執行（桌面 smoke 與 aria 結構已驗證）。
 6. `meta.date` 為 UTC 日，本機午夜前後可能較本機日早 1 天。
 7. 極巨攻擊屬性資料的物種↔G-Max 招式映射（`MAX_GMAX_MOVE`）是 build 唯一人工表（GM 內無該對照），18 筆已與 pokemondb 現頁核對；未來新 G-Max 物種要人工補表（build 有映射失敗 fail-loud）。
+
+---
+
+# 第二輪審查（issue #2，R01–R14）逐項處置表
+
+原文：GitHub issue #2（二輪審查）。同在 `audit-fix-32` / Draft PR #1 追加修正。
+驗證通用證據：`npm test`（core 0 失敗＋整合測試 40 項全過＋audit「全部檢查通過」）、
+`node tools/build_data.js` 重建（1718 型態 280/341/796/301）、雙基準報告
+`docs/tier-diff-2026-11-06.md`（vs 修正前 v25）與 `docs/tier-diff-2026-11-06-vs-prev.md`（vs 修正前提交 HEAD）、
+瀏覽器 smoke（console 零錯誤＋四項重點檢查，詳見下）。
+
+### R01 bump hash 對 checkout 換行符敏感 — **confirmed**
+`tools/bump.js` 改為 hash 前正規化（去 BOM＋CRLF→LF），checkout 行尾差異不再造成假 hash 變化。
+證據：連跑兩次輸出相同 `css=d8b0b104fb core=0bfa76a007 js=483188647e data=2046f86856`；CI 期望的 css hash 一致。
+
+### R02 G-Max 物種的 `_dmax` 行繼承專屬招式／450 威力 — **confirmed**
+`dmxCalc(p, dmg, fixedVfx)` 一律拆行後逐行重算：`_gmax`＝450＋`MAX_GMAX_MOVE`、
+蒼響／藏瑪然特＝R06 專屬鋼屬 350、其餘 D-Max＝350＋快招屬性；每行 `dmx.mode` 揭露 `'gmax'/'dmax'`。
+證據：整合測試 R02 區塊（charizard／venusaur／blastoise 三組拆行 dmx 各自獨立、`_dmax` dps < `_gmax` dps）；修正前此測試必失敗。
+
+### R03 搜尋字串只比對篩選名單 — **confirmed**
+`core.js searchPlan(rows, dbRows)` 吃整個資料庫 `{dex,id,keep,shadow,max}`；名單外的同編號「保留個體」
+（會被編號搜尋一起選中）也記入 `mixedDexes` 強制警告。呼叫端（app.js copyList）現對照全型態。
+證據：整合測試 R03 區塊以真實案例 #45（vileplume 可送＋vileplume_shadow 保留）驗證 `mixedDexes=['45']`；瀏覽器 smoke 名單外警告列出「霸王花（暗影）」。
+
+### R04 audit 數值比較會誤／暗影保護不足 — **confirmed（反向稽核抓出真誤判）**
+`audit_data.js` 比較處補 `Number.isFinite` 過濾；tpTop `Math.min`→`Math.max`（「任一屬性很強」取最大值）；
+新增 `shadowValuable()`（build_data.js）：任一聯盟（含 500）前 150／PvE 前 10%／屬性分榜前 5%（pct≥95）的暗影
+不得判可傳送——judge 一般分支與 NFE 連坐兩處套用，與 audit 同規則。audit 支援 `argv[2]` 路徑供反向測試。
+**反向稽核真實成果**：`wailmer_shadow`（500 榜 #33）與 `tirtouga_shadow`（#89）原被 NFE 連坐誤判可傳送——
+`bestRank` 有 1500 名次時不看 500 榜，與 audit 暗影規則不一致；統一後兩筆獲保護（「未完全進化」保留）。
+證據：修正後 audit「全部檢查通過」；整合測試注入假高價值暗影 exit≠0、無風險假資料不誤報（反向測試）。
+
+### R05 普通屬性蓄力招混入弱點分榜 — **confirmed**
+`tpDps` 分榜跳過 `cType==='normal'`（普通屬性沒有 ×1.6 弱點對象，分榜不成立）。
+證據：整合測試「全部型態的 tp 皆無 normal 鍵」；porygon 系／雷吉奇卡斯等不再被假分榜灌級。
+
+### R06 蒼響／藏瑪然特被當成超極巨化 — **confirmed**
+2026-11-06 核實（PokeMiners GM `max_behemoth_blade`／`max_behemoth_bash`）：兩者是**真 Dynamax**（D-Max 級 350），
+Max 招式為專屬鋼屬；前端依 `dmx.mode` 分流詳細頁文案。
+證據：整合測試 R06 區塊（tp='steel'、mode='gmax'、fixed）；瀏覽器 smoke 詳細頁三種文案分流正確。
+
+### R07 無極汰那 tier0「錯過無法再捕」不成立 — **confirmed（推翻第一輪 H10 處置）**
+翻案依據：Dynamax Cannon 是**一般蓄力招**（GM power 80/−45 能量；PvE 215）＋冒險效果
+（Max 招式全隊升 1 級 10 分鐘，5,000 星塵＋30 糖——排除蒼響／藏瑪然特）；
+Max Finale 2025-08 首發、Dynamax Trails 2026-11-16~23 回歸可再捕 → 改評 tier1
+「傳說寶可夢：至少保留一隻」＋理由明示活動期間限定與冒險效果；極巨攻擊＝快招屬性的一般極巨攻擊。
+證據：整合測試 R07 區塊（dmx.mode='dmax'、非 tier0、理由含回歸資訊）；vs-prev 報告 t0→t1 列名。
+
+### R08 HITS_PER_METER=25 未驗證敏感度 — **design decision（揭露＋已驗證不敏感）**
+敏感度分析：N∈{15,20,25,30,35} 五組重算，`dmx.pct≥90` 成員 17 筆完全一致 → 門檻判定不隨 N 變動；
+`HITS_PER_METER` 維持 25 並在 `core.js` 註記分析結果。
+證據：五組成員集合逐一交集＝17/17。
+
+### R09 過期盃賽榜影響評級 — **confirmed**
+`CUP_FRESH_DAYS=45`：盃賽榜超過 45 天未重抓 → 停用「限制盃人選」評級升級與 NFE cupTop10 保護，
+記入 `meta.incomplete` 揭露。
+證據：整合測試 R09/R12 區塊（過期必有揭露）；build 輸出含盃賽撈取日。
+
+### R10 parse_max 合併語意依賴行序 — **confirmed（含真 bug 修復）**
+真 bug：dedupe key 未含型態（`m[2]`）——真頁面上同 species 的 Dynamax／Gigantamax 行名稱 cell 完全相同，
+key 不含 m[2] 時第二行永遠被略過，G-Max 標記帶不帶起來全看行序。修復後 key 加 `m[2].toLowerCase()`＋
+first-seen 改為合併語意；並抽出純函式 `parseMaxEntries`／`buildIndex` 供測試。
+證據：CLI 重跑 153 筆／18 G-Max 與舊結果完全一致（舊資料靠 G-Max 行在前倖存）；整合測試「先 G 後 D / 先 D 後 G 不變」（修正前必失敗）。
+
+### R11 mixWarn modal 焦點／Esc 行為 — **confirmed**
+先存還原目標再移動焦點（先 focus 會把還原目標弄丟）；Esc 在 modal 開啟時只關 modal、攔截傳播
+避免同時觸發底層詳情面板的關閉。
+證據：`app.js` R11 段註解；瀏覽器 smoke 開關 modal 正常。
+
+### R12 來源缺漏靜靜吞掉 — **confirmed**
+缺 `cup_rankings.json`（直接影響「限制盃人選」評級）、極巨招式缺失（VN_BM_*）、G-Max 物種映射失敗——
+三者皆直接中止建置（fail-loud），不再降級為警告。
+證據：`build_data.js` 三處 `process.exit(1)`；現行建置 exit 0（無缺漏）。
+
+### R13 diff_tiers 基準檔依賴 gitignored 快照＋from=0 誤過濾 — **confirmed（修了兩處）**
+① 基準支援 `git:<revision>`，預設 `git:97ed136`（已驗證與 `_baseline_v25.json` 逐位元組相同）＋可自訂輸出檔名；
+② `r.from=0`（falsy）使 t0→t1 升降級被誤吞進拆行註記 → 改以 `'note' in r` 區分，4 筆 t0→t1 重回升降級表。
+證據：vs-prev 報告其餘升降級 9 筆含 eternatus／regigigas／regigigas_shadow／porygon_z_shadow。
+
+### R14 缺整合／反向測試 — **confirmed**
+新增 `tools/test_integration.js`（40 項：具體物種×實際規則交叉驗證＋反向測試——修正前必失敗、修正後通過；
+反向稽核用 subprocess 注入假資料驗 returncode）；package.json 增 `test:core`／`test:integration`。
+證據：`npm test` 全綠。
+
+## 第二輪升降級雙基準複核
+
+- vs v25：36 筆變化——**12 筆轉可傳送、81 筆防護升級**（其中晉升必留 2 筆：exeggutor_shadow／absol_shadow，
+  依據 tp≥97 真屬性分榜；`docs/tier-diff-2026-11-06.md` 逐筆附理由）。逐筆複核通過：
+  exeggutor／absol／gigalith_shadow 有真 tp≥97 分榜依據、porygon_z（1500 榜 #1133、PvE 75.2%）→t3 合理。
+- vs HEAD：22 筆——11 筆轉可傳送（每筆皆附理由複核）、2 筆防護升級、9 筆其餘升降級
+  （含 salamence_shadow t1→t0＝PvE 前 3% 實力提升；eternatus／regigigas 等 t0→t1＝R07/R06 翻案；
+  wailmer／tirtouga_shadow 獲 R04 保護）。完整理由見 `docs/tier-diff-2026-11-06-vs-prev.md`。
+
+## 第二輪瀏覽器 smoke
+
+dev server（`python -m http.server 8601 --directory site`）：① console 0 error；
+② R06 三種「極巨戰招式」分流文案（_gmax 專屬超極巨招式／_dmax 快招屬性／蒼響專屬 Max 招式鋼屬固定）；
+③ R03 名單外保留個體警告（#45 名單外列出「霸王花（暗影）」）；④ modal 手機可用（.modalbox max-height 80vh＋可捲動）、
+頁面無水平溢位、`@media` 斷點存在。

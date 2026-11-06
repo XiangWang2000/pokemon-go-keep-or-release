@@ -202,18 +202,23 @@ function openDetail(f) {
   // Max Battle 槽位（GO 介面名稱：攻擊／極巨防壁／極巨回復）：
   // H03 機制修正：一般極巨攻擊的屬性＝快招屬性（不是蓄力招！用快招招不同快招就打不同
   //   屬性的極巨攻擊）；超極巨化個體的攻擊槽是專屬超極巨招式，屬性固定（dmx.tp 來源：GM VN_BM）
+  // R06：蒼響／藏瑪然特雖是一般 Dynamax（dm 而非 dmg），Max 攻擊仍是「專屬鋼屬招式」
+  //   （Behemoth Blade／Bash，D-Max 威力級）——前端依 dmx.mode 分流，不誤掛快招屬性
   let maxBlock = '';
   if (f.dmx && (f.dm || f.dmg)) {
-    const atks = f.dmg
-      ? `<span class="charged">極巨攻擊〈${TYPE_ZH[f.dmx.tp] || f.dmx.tp || '—'}〉<small>專屬超極巨招式（G-Max Move，屬性固定）</small></span>`
+    const fixedRow = f.dmg || f.dmx.mode === 'gmax';
+    const gmaxRow = !!f.dmg;
+    const atks = fixedRow
+      ? `<span class="charged">極巨攻擊〈${TYPE_ZH[f.dmx.tp] || f.dmx.tp || '—'}〉<small>${gmaxRow ? '專屬超極巨招式（G-Max Move，屬性固定）' : '專屬 Max 招式（Behemoth Blade／Bash，屬性固定）'}</small></span>`
       : (f.fmr || []).map(id => {
           const m = (DATA.moves || {})[id];
           return m && m.t ? `<span class="charged">極巨攻擊〈${TYPE_ZH[m.t] || m.t}〉<small>${CORE.esc(m.n)}（用同屬性快招集能即為此攻擊）</small></span>` : '';
         }).join('');
     maxBlock = `<div class="maxmoves"><b>極巨戰招式（Max Battle 用）</b>
       <div class="moves">${atks}<span class="charged">極巨防壁<small>替全隊減傷</small></span><span class="charged">極巨回復<small>回復自己與同伴 HP</small></span></div>
-      <p class="muted" style="font-size:11px">${f.dmg
-        ? '超極巨化個體的極巨攻擊＝專屬超極巨招式，屬性固定不隨快招變化；一般極巨化個體才隨快招屬性變化'
+      <p class="muted" style="font-size:11px">${fixedRow
+        ? (gmaxRow ? '超極巨化個體的極巨攻擊＝專屬超極巨招式，屬性固定不隨快招變化；一般極巨化個體才隨快招屬性變化'
+                   : '蒼響／藏瑪然特的極巨攻擊＝專屬 Max 招式（鋼屬固定），布置快招不影響屬性')
         : '一般極巨攻擊的屬性＝<b>快招</b>屬性（配錯快招就打不出想要的屬性，快招可用快招學習器改）'}；快招累積 Max 條後，於極巨階段放招。</p></div>`;
   }
 
@@ -279,7 +284,7 @@ function openDetail(f) {
   if (f.dmx && (f.dm || f.dmg)) {
     const atkPct = Math.max(0.1, 100 - f.dmx.pct).toFixed(1).replace(/\.0$/, '');
     dmxHtml = `<details class="fold"><summary>極巨戰（Max Battle）攻擊估算<span class="fdnote">攻手前 ${atkPct}%</span></summary><div class="foldbody"><table class="stats">
-      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : '（＝快招屬性，換快招即換屬性）'}</td></tr>
+      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : (f.dmx.mode === 'gmax' ? '（專屬 Max 招式，固定不變）' : '（＝快招屬性，換快招即換屬性）')}</td></tr>
       <tr><td>極巨攻擊循環 DPS 估算</td><td>${f.dmx.dps}</td></tr>
       <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（可極巨化型態內）</td></tr></table>
       <div class="ivref" style="margin-top:6px">Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主。估算假設（揭露式的相對指標，不是實測模擬）：<br>
@@ -539,7 +544,13 @@ function toast(msg) {
 // &shadow／&dynamax；同編號混有不同形態時強制跳出警告（遊戲搜尋會一次選中同編號全部形態，
 // H07：不得直接全選傳送）
 $('#copyList').addEventListener('click', () => {
-  const plan = CORE.searchPlan(lastList.map(f => ({ dex: f.dex, shadow: /_shadow$/.test(f.id), max: !!(f.dm || f.dmg) })));
+  // R03：搜尋字串的形態風險檢查要對照「整個資料庫」，不能只看目前篩出的名單——
+  // 同編號名單外的保留個體（暗影／極巨化／一般形態）也會被編號搜尋一起選中
+  const dbRows = FORMS.map(f => ({
+    dex: f.dex, id: f.id, keep: f.verdict.tier < 3,
+    shadow: /_shadow$/.test(f.id), max: !!(f.dm || f.dmg),
+  }));
+  const plan = CORE.searchPlan(lastList.map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), max: !!(f.dm || f.dmg) })), dbRows);
   const s = plan.text;
   const copyText = navigator.clipboard && navigator.clipboard.writeText
     ? navigator.clipboard.writeText(s)
@@ -563,35 +574,47 @@ $('#copyList').addEventListener('click', () => {
     .catch(() => toast('複製失敗：瀏覽器不允許存取剪貼簿'));
 });
 // 混形態警告視窗
+let lastMixFocus = null;
 function showMixWarn(plan) {
   const modal = document.getElementById('mixWarn');
   if (!modal) return;
   const body = document.getElementById('mixWarnBody');
   const mixed = plan.mixedDexes || [];
   if (!mixed.length) { modal.classList.add('hidden'); return; }
-  // 列出每個問題編號在名單內的形態（zh 名稱）
+  // 名單內的 zh 名稱（問題編號列出的是名單內形態）
   const byDex = {};
   lastList.forEach(f => { (byDex[f.dex] ||= []).push(f); });
+  // R03：名單外的保留個體（會被編號搜尋一起選中的）——從 FORMS 補形態名稱
+  const hiddenKeep = {};
+  for (const d of mixed) {
+    const listed = new Set((byDex[d] || []).map(f => f.id));
+    const others = FORMS.filter(f => f.dex === d && !listed.has(f.id) && f.verdict.tier < 3);
+    hiddenKeep[d] = others.map(f => f.zh).filter(Boolean); // zh 已含形態字樣（如「暗影」「極巨化」）
+  }
+  const anyHidden = Object.values(hiddenKeep).some(a => a.length);
   const rows = mixed.map(d => {
-    const zf = [...new Set((byDex[d] || []).map(f => f.zh))];
-    return `<tr><td>#${d}</td><td>${zf.map(CORE.esc).join('、')}</td></tr>`;
+    const inList = [...new Set((byDex[d] || []).map(f => f.zh))];
+    const keep = (hiddenKeep[d] || []).filter(z => !inList.includes(z));
+    const keepHtml = keep.length ? `<br><small>名單外的保留個體（也會被一起選中）：${keep.map(CORE.esc).join('、')}</small>` : '';
+    return `<tr><td>#${d}</td><td>${inList.map(CORE.esc).join('、')}${keepHtml}</td></tr>`;
   }).join('');
-  body.innerHTML = `<p><b>這份名單裡有 ${mixed.length} 個圖鑑編號混合了不同形態</b>——遊戲的搜尋會一次選中該編號的<b>全部形態</b>（暗影／極巨化／一般個體無法用編號區分），直接全選傳送<b>會把要留的也送掉</b>。</p>
+  body.innerHTML = `<p><b>這份名單裡有 ${mixed.length} 個圖鑑編號混合了不同形態</b>——遊戲的搜尋會一次選中該編號的<b>全部符合限定詞的形態</b>（暗影／極巨化／一般個體無法用編號區分），直接全選傳送<b>會把要留的也送掉</b>。</p>
     <table class="stats" style="width:100%">${rows}</table>
     <p style="margin-top:8px">正確做法：在遊戲收藏搜尋列<b>先加限定詞</b>（暗影加 <code>&amp;shadow</code>、可極巨化個體加 <code>&amp;dynamax</code>，現行 GO 支援這兩個關鍵字），或逐隻挑選後再傳送。<b>不要只用編號全選。</b></p>`;
   modal.classList.remove('hidden');
+  // R11：先存還原目標、再移動焦點（先 focus 會把 activeElement 變成 closeBtn、還原目標就丟了）
+  lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
   const closeBtn = document.getElementById('mixWarnClose');
   if (closeBtn) closeBtn.focus({ preventScroll: true });
-  lastMixFocus = document.activeElement === closeBtn ? null : document.activeElement;
 }
-let lastMixFocus = null;
 {
   const modal = document.getElementById('mixWarn');
   if (modal) {
     const close = () => { modal.classList.add('hidden'); if (lastMixFocus) { lastMixFocus.focus({ preventScroll: true }); lastMixFocus = null; } };
     document.getElementById('mixWarnClose').onclick = close;
     modal.addEventListener('click', e => { if (e.target === modal) close(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+    // R11：Esc 在 modal 開啟時只關 modal——攔截傳播，避免同時觸發底層詳情面板的關閉
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { e.stopImmediatePropagation(); close(); } });
   }
 }
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
@@ -638,7 +661,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=58f80964b1').then(r => {
+fetch('data/data.json?v=2046f86856').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {

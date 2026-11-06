@@ -3,23 +3,40 @@
  * 比對「修正前基準」與「修正後」data.json，輸出逐型態的四級評級變化，
  * 並特別清點 *轉為可傳送*（tier1/2 → tier3）的型態——這是被錯判放生的最高風險，
  * 每一筆都附上理由供人工複核。
- * 用法：node tools/diff_tiers.js [baseline=../data/_baseline_v25.json] [current=../site/data/data.json]
- * 輸出：stdout 摘要 + docs/tier-diff-<日期>.md（完整報告）
+ * 用法：node tools/diff_tiers.js [baseline] [current] [outName]
+ *   baseline：檔案路徑、或 "git:<revison>"（從 git 物件庫讀 site/data/data.json，R13）。
+ *             預設 git:97ed136 ＝ 32 項修正前的上一次提交（已驗證與 data/_baseline_v25.json 逐位元組同等）。
+ *   outName：輸出檔名（預設 tier-diff-<當前資料日期>.md；雙基準比對時可自訂後綴，避免互相覆蓋）
+ * 輸出：stdout 摘要 + docs/<outName>.md（完整報告）
  */
 const fs = require('fs');
 const path = require('path');
+const cp = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const baseFile = process.argv[2] || path.join(ROOT, 'data', '_baseline_v25.json');
+const baseArg = process.argv[2] || 'git:97ed136';
 const curFile = process.argv[3] || path.join(ROOT, 'site', 'data', 'data.json');
+const outName = process.argv[4] || null;
 const outDir = path.join(ROOT, 'docs');
 
-if (!fs.existsSync(baseFile)) {
-  console.error('找不到基準檔 ' + baseFile + '（基準 data/_baseline_v25.json 需由修正前的 build 產出、另存快照）');
-  process.exit(1);
+// R13：基準不再依賴 gitignored 的 data/_baseline_v25.json 快照（很容易忘記重建）——
+// 預設直接從本 repo 的 git 歷史讀「修正前最後一次提交」的 data.json，任何 checkout 都能重現。
+function loadJson(name) {
+  let txt;
+  if (/^git:(.+)$/.test(name)) {
+    const rev = name.slice(4);
+    txt = cp.execSync('git show ' + rev + ':site/data/data.json', { maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+  } else {
+    if (!fs.existsSync(name)) {
+      console.error('找不到基準檔 ' + name + '（可用 git:<revison> 指向 repo 歷史快照）');
+      process.exit(1);
+    }
+    txt = fs.readFileSync(name, 'utf8');
+  }
+  return JSON.parse(txt.replace(/^\uFEFF/, ''));
 }
-const base = JSON.parse(fs.readFileSync(baseFile, 'utf8'));
-const cur = JSON.parse(fs.readFileSync(curFile, 'utf8'));
+const base = loadJson(baseArg);
+const cur = JSON.parse(fs.readFileSync(curFile, 'utf8').replace(/^\uFEFF/, ''));
 
 const TIER_NAMES = ['必留', '建議保留', '看情況', '可傳送'];
 const mapOf = d => new Map(d.forms.map(f => [f.id, { tier: f.verdict.tier, why: (f.verdict.why || []).join('；') }]));
@@ -49,7 +66,7 @@ cur.forms.forEach(f => curCounts[f.verdict.tier]++);
 console.log('=== 升降級比對（基準 → 修正後）===');
 console.log(`基準：${base.forms.length} 型態；修正後：${cur.forms.length} 型態`);
 console.log(`修正後各級：${line(0, curCounts[0])}｜${line(1, curCounts[1])}｜${line(2, curCounts[2])}｜${line(3, curCounts[3])}`);
-console.log(`評級變化合計：${diff.length} 筆（不含拆分行增刪 ${other.length} 中的註記項）`);
+console.log(`評級變化合計：${diff.length} 筆（不含拆分行增刪 ${other.filter(r => 'note' in r).length} 中的註記項）`);
 console.log('');
 console.log('★ 最重要核對：轉為「可傳送」（t1/2 → t3）＝', toSend.length, '筆');
 for (const r of toSend) console.log(`  ${r.id}：t${r.from}→t3｜${r.why}`);
@@ -62,13 +79,17 @@ for (const [t, rs] of Object.entries(byTo)) console.log(`  → ${TIER_NAMES[t]} 
 // ---------- 完整報告輸出 docs/ ----------
 fs.mkdirSync(outDir, { recursive: true });
 const today = cur.meta && cur.meta.date ? cur.meta.date : new Date().toISOString().slice(0, 10);
+const outFile = path.join(outDir, outName || `tier-diff-${today}.md`);
+const baselineLabel = /^git:/.test(baseArg)
+  ? `git ${baseArg.slice(4).slice(0, 7)}（site/data/data.json，修正前提交）`
+  : path.basename(baseArg);
 const md = [];
 md.push(`# 評級升降級比對報告（${today}）`);
 md.push('');
-md.push(`- 基準：${path.basename(baseFile)}（修正前快照，${base.forms.length} 型態）`);
+md.push(`- 基準：${baselineLabel}（修正前快照，${base.forms.length} 型態）`);
 md.push(`- 修正後：site/data/data.json（${cur.forms.length} 型態）`);
 md.push(`- 修正後各級：${line(0, curCounts[0])}｜${line(1, curCounts[1])}｜${line(2, curCounts[2])}｜${line(3, curCounts[3])}`);
-md.push(`- 評級變化：**${diff.length} 筆**；另「拆分行增刪」（_dmax/_gmax 專案調整）${other.filter(r => !r.from).length} 筆`);
+md.push(`- 評級變化：**${diff.length} 筆**；另「拆分行增刪」（_dmax/_gmax 專案調整）${other.filter(r => 'note' in r).length} 筆`);
 md.push('');
 md.push(`## ⚠ 轉為「可傳送」（建議保留 → 可傳送）：${toSend.length} 筆（人工複核清單）`);
 md.push('');
@@ -85,7 +106,10 @@ for (const [t, rs] of Object.entries(byTo)) {
 md.push('');
 md.push(`## 其餘升降級`);
 md.push('');
-const others = other.filter(r => r.from);
+// 注意：tier0 的 from=0 是 falsy——不可用 !r.from 區分兩類，否則 t0→t1 的成熟升降級會被
+// 誤吞進「拆分行註記」（本次（2026-11-06）就吞掉了 eternatus／regigigas 等 4 筆 t0→t1）。
+// 兩類以「有沒有 note 欄位」區分最直接
+const others = other.filter(r => !('note' in r));
 md.push(`共 ${others.length} 筆：`);
 if (others.length) {
   md.push('| 型態 | 原→新 | 修正後理由 |');
@@ -95,19 +119,23 @@ if (others.length) {
 md.push('');
 md.push('## 拆分行註記（資料結構調整，非評級倒退）');
 md.push('');
-const splits = other.filter(x => !x.from);
+const splits = other.filter(x => 'note' in x);
 if (splits.length) for (const r of splits.slice(0, 60))
   md.push(`- ${r.id}：${r.note}${r.ct != null ? `（現為 ${TIER_NAMES[r.ct]}）` : ''}`);
 md.push('');
 md.push('## 修改重點摘要');
 md.push('');
 md.push('- PvE 能量模型重寫（H01）、暗影防禦縮減納入（M07）、DPS 指標改名與假設揭露（H02/M05/M06）');
-md.push('- 極巨攻擊屬性＝快招屬性（H03）、威力分級 350/450（H04/H05）、Max+ 揭露');
-md.push('- 無極汰那特案（H10）：tier0 必留＋專屬招式 Dynamax Cannon');
+md.push('- 極巨攻擊屬性＝快招屬性（H03）、威力分級 350/450（H04/H05）、Max+ 揭露、R02 拆行後逐行分算（_dmax＝350，_gmax＝450）');
+md.push('- R06 蒼響／藏瑪然特＝真 Dynamax＋專屬鋼屬 Max 招（Behemoth Blade／Bash，威力級 350）');
+md.push('- R07 無極汰那＝一般 Dynamax（撤回「G-Max 級 450／tier0 必留」特案；專屬招式是蓄力招＋冒險效果）');
+md.push('- R05 普通屬性蓄力招退出 ×1.6 弱點分榜（porygon 系／雷吉奇卡斯等不再被假屬性分榜灌級）');
+md.push('- R09 盃賽榜 45 天新鮮度：過期盃停用「限制盃人選」評級升級');
+md.push('- L04 暗影高價值保護統一（R04）：任一聯盟（含 500）前 150／PvE 前 10%／屬性分榜前 5% 不得判可傳送');
 md.push('- PvE 屬性分榜（H08）：tpDps × 攻擊體質修正後重建；tp≥97 → tier0、tp≥90 → 不得判可傳送');
 md.push('- 百分位母體去重（H09）：排除 _dmax/_gmax 拆分行');
 md.push('- NFE 連坐限縮＋自身戰力保護（H06）');
 md.push('- IV 參考半級保留（M01）、rank 4096 全枚舉同分同名次（M02）');
-md.push('- 搜尋字串形態限定詞＋混形態警告（H07）');
-fs.writeFileSync(path.join(outDir, `tier-diff-${today}.md`), md.join('\n') + '\n');
-console.log('\n完整報告 → docs/tier-diff-' + today + '.md');
+md.push('- 搜尋字串形態限定詞＋混形態警告（H07）＋R03 名單外同編號保留形態強制警告');
+fs.writeFileSync(outFile, md.join('\n') + '\n');
+console.log('\n完整報告 → docs/' + path.basename(outFile));

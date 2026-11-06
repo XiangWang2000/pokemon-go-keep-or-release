@@ -11,7 +11,8 @@ python -m http.server 8600 --directory site
 # 然後開 http://localhost:8600/
 ```
 
-**改到 `app.js`／`style.css`／`data.json` 後，出版前跑 `node tools/bump.js`**——它把三個參數改成「檔案內容 SHA256 前 10 碼」（內容沒變 hash 不變、可重跑；內容變了自動失效瀏覽器快取）。不再手動累加版本數字。
+**改到 `app.js`／`style.css`／`data.json` 後，出版前跑 `node tools/bump.js`**——它把三個參數改成「檔案內容 SHA256 前 10 碼」（內容沒變 hash 不變、可重跑；內容變了自動失效瀏覽器快取）。
+R01：hash 前先正規化（去 BOM＋CRLF→LF），checkout 換行符差異不再造成假 hash 變化。不再手動累加版本數字。
 
 **提交訊息約定**（2026-11-04 起）：一次工作批次＝一個提交；訊息＝主旨在第一行＋逐項清單 `- `，讓人不用點開就知道改了什麼；不寫相互不可讀的批次代號版本（如「第五批 v=18」）。歷史不再逐小修堆疊。
 
@@ -50,12 +51,17 @@ node tools/build_data.js
 node tools/bump.js
 ```
 
-`npm run build`＝重建；`npm test`＝核心單元測試（`tools/test_core.js`，24 項手算錨點）＋資料稽核（`tools/audit_data.js`）；
-`node tools/diff_tiers.js`＝對照基準快照（`data/_baseline_v25.json`）產出升降級報告（部署前必看，重點核對「轉為可傳送」清單）。
+`npm run build`＝重建；`npm test`＝核心單元測試（`tools/test_core.js`，24 項手算錨點）＋整合測試（`tools/test_integration.js`，39 項——
+真資料交叉驗證＋反向稽核，R14，40 項）＋資料稽核（`tools/audit_data.js`）；
+`node tools/diff_tiers.js [基準] [現行] [輸出檔名]`＝升降級報告（部署前必看，重點核對「轉為可傳送」清單）。
+基準可用 `git:<revision>`（R13：預設 `git:97ed136`＝修正前最後一次提交，任何 checkout 都能重現；不再依賴 gitignored 的快照檔）。
+`tools/parse_max.js`（R10）拆出純函式 `parseMaxEntries`／`buildIndex` 供整合測試直接呼叫；
+`tools/audit_data.js` 支援 `argv[2]` 資料檔路徑，反向稽核即靠它注入假資料驗證攔截。
+`cups` 由 R02 起也改為 fail-fast：缺檔影響「限制盃人選」評級 → 中止建置（不再降級為警告）。
 
 ```jsonc
 // package.json
-{ "scripts": { "build": "node tools/build_data.js", "test": "node tools/test_core.js && node tools/audit_data.js", "audit": "node tools/audit_data.js" } }
+{ "scripts": { "build": "node tools/build_data.js", "test": "node tools/test_core.js && node tools/test_integration.js && node tools/audit_data.js", "test:core": "node tools/test_core.js", "test:integration": "node tools/test_integration.js", "audit": "node tools/audit_data.js" } }
 ```
 
 核心計算（CPM／IV 排名／PvE 能量循環／極巨攻擊速率／搜尋字串／esc）統一放在 `site/js/core.js`：
@@ -92,16 +98,16 @@ node tools/bump.js
 小小盃（500 CP 活動賽制）**不作為主依據**：該盃規榜（`cupR` 的 `little_500`）前 50 名走一般分支的
 「限制盃人選 → 建議保留」；tier1/2 另加次級註記「另為小小盃…一般聯盟對戰可忽略」。
 卡面顯示時，`f.pvp[500]` 那格正名為「**500 格式總榜**」（PvPoke 500 CP 格式總排名，非現行小小盃盃規，
-前端 `rankName()`），與現行杯規榜分開命名避免同頁兩份數字打架；`#501` 之後的尾段名次不上卡面。
+前端 `rankName()`），與現行盃規榜分開命名避免同頁兩份數字打架；`#501` 之後的尾段名次不上卡面。
 
 | 條件                     | 評級           |
 |--------------------------|----------------|
-| 幻獸 / 無極汰那 / 超極巨化 / 超級進化 / 主力聯盟前 50 名 / PvE 估算前 3% / **PvE 屬性分榜前 3%** | 必留           |
-| 已暗影且主力聯盟前 200 / 傳說 / 異獸 / 主力聯盟前 150 / PvE 前 10% / 現行杯規榜前 50 名（含小小盃） / 極巨戰攻手估算前 10% | 建議保留 |
+| 幻獸 / 超極巨化 / 超級進化 / 主力聯盟前 50 名 / PvE 估算前 3% / **PvE 屬性分榜前 3%** | 必留           |
+| 傳說 / 已暗影且主力聯盟前 200 / 異獸 / 主力聯盟前 150 / PvE 前 10% / 現行盃規榜前 50 名（含小小盃，僅在盃賽榜 45 天內有效——R09） / 極巨戰攻手估算前 10% / **任一聯盟（含 500 格式榜）前 150 名的暗影** | 建議保留 |
 | **PvE 屬性分榜前 10%（不得判可傳送）** / 區域限定 / 未完全進化 / 同進化線下游皆可送 / 主力聯盟前 350 | 看情況        |
 | 其餘（附圖鑑例外說明）   | 可傳送         |
-| （一致性修正）同進化線的進化後型態全部可傳送時，未進化型態一併降為可傳送——**只連走「未完全進化」理由判定**；**自身 bestRank（含 500 格式總榜）≤150 或現行限制盃前 10 名不降**（如 carvanha_shadow 500 榜頂尖的暗影 NFE）；**區域限定／傳說／幻獸／異獸／Mega／GMax 不參與連坐** | — |
-| （暗影保護）全物種 PvE 前 10% 或任一屬性分榜前 10% 的暗影一律不判可傳送——火箭隊輪替、暗影再取得不易 | — |
+| （一致性修正）同進化線的進化後型態全部可傳送時，未進化型態一併降為可傳送——**只連走「未完全進化」理由判定**；**自身 bestRank（含 500 格式總榜）≤150、現行限制盃前 10 名、或過 R04 暗影保護不降**（如 carvanha_shadow 500 榜頂尖的暗影 NFE）；**區域限定／傳說／幻獸／異獸／Mega／GMax 不參與連坐** | — |
+| （暗影保護，R04 統一口徑 `shadowValuable()`）任一聯盟（含 500）前 150／全物種 PvE 前 10%／任一屬性分榜**前 5%（pct≥95）**的暗影一律不判可傳送——火箭隊輪替、暗影再取得不易；judge 一般分支與 NFE 連坐兩處都套用同一函式，與 `audit_data.js` 反向稽核同規則 | — |
 | （傳說／異獸讓路）PvE 保護判定分榜前 3% 優先於「至少保留一隻」模板 → tier0（避免暗影超夢等案例被收藏模板蓋掉戰力事實） | 必留 |
 | 可極巨化個體地板為看情況；**有效體質（HP×DEF）前 5% 的物種為 Max Battle 核心坦克位 → 建議保留**（社群共識必練一隻體質好的、Max Spirit／Guard 投資優先，如幸福蛋極巨化；Power Spot 可重複遭遇，不宜 tier0） | 建議保留／看情況 |
 
@@ -139,15 +145,22 @@ GO 的 Max Battle 個體是獨立個體（只有 Power Spot 抓到／孵出的�
 判定依 GO 抓取機制的顯式清單（`build_data.js` 的 `MAX_BODY_FORMS`／`MAX_BODY_BASE`），
 不拿圖示檔名當代理（武道熊師一擊流是 GO 預設形態、圖示為 `892.png`，圖示代理會誤拆）：
 
-- `MAX_BODY_FORMS`：蒼響劍之王、藏瑪然特盾之王（能量形態轉換，劍之王不巨大化但可參戰）＋
+- `MAX_BODY_FORMS`：蒼響劍之王、藏瑪然特盾之王＋
   武道熊師一擊流／連擊流（Kubfu 是 GO 第一個「只發佈極巨化個體」的物種）＋
   **無極汰那**（2026-11 GO Pass 活動限定、單次取得，個體全部可極巨化，無「一般僅能傳送」個體）
 - `MAX_BODY_BASE`：kubfu
 - `MAX_EXTRA`：清單源（pokemondb）漏列但實際可極巨化的物種顯式補標——目前 `melmetal`
   （經 Max Battle 特殊調查取得，拆出 `melmetal_dmax` 分行）
+- **R06（2026-11-06 核實：PokeMiners GM `max_behemoth_blade`／`max_behemoth_bash`）**：
+  蒼響／藏瑪然特＝**真 Dynamax**（非超極巨化）＋Max 招式為**專屬鋼屬 Behemoth Blade／Bash**
+  （威力級＝一般 D-Max 尺度 350，非 G-Max 的 450）；前端依 `dmx.mode='gmax'`（屬性固定）分流文案，
+  詳細頁文案「蒼響／藏瑪然特的極巨攻擊＝專屬 Max 招式（鋼屬固定），布置快招不影響屬性」
 - `MAX_SPECIAL`：**無極汰那**——不在 pokemondb 清單（做成 GO Pass 特例），補標極巨化並納入 MAX_BODY_FORMS；
-  專屬 Max 招式 **Dynamax Cannon**（龍屬，G-Max 威力級 450；vfx `max_dynamax_cannon`）
-  走專屬招式估算路徑；judge 評 tier0 必留（GO Pass 錯過無法再捕）。
+  但 **R07 翻案**：其 Max 招式 **Dynamax Cannon 是一般蓄力招**（GM power 80/215、能量 −45）＋
+  冒險效果「Max 招式全隊升 1 級 10 分鐘（5,000 星塵＋30 糖，排除蒼響／藏瑪然特）」，
+  **不**走專屬招式估算路徑——極巨戰中的極巨攻擊仍是快招屬性的一般極巨攻擊；且「錯過無法再捕」不成立
+  （Max Finale 2025-08 首發、Dynamax Trails 2026-11-16~23 回歸可再捕）→ 評級 tier1
+  「傳說寶可夢：至少保留一隻」＋理由明示活動期間限定與冒險效果
 
 ### 極巨戰（Max Battle）攻擊估算
 
@@ -156,13 +169,20 @@ Max Battle 只有極巨化個體能出戰、輸出由「極巨攻擊」主導，
 說明 + Bulbapedia「Max Move (GO)」威力表 + PokeMiners GM `VN_BM_*` 模板）：
 
 - **一般極巨攻擊的屬性＝快招屬性**（不是蓄力招！換快招就是換屬性）；超極巨化個體的攻擊槽是專屬超極巨招式、
-  屬性固定（`tp` 來源：GM vfx 名，物種映射 `MAX_GMAX_MOVE` 為 build 唯一人工表——GM 內無該對照）
+  屬性固定（`tp` 來源：GM vfx 名，物種映射 `MAX_GMAX_MOVE` 為 build 唯一人工表——GM 內無該對照；
+  映射失敗＝dmx 資料不正確 → R12 改為直接建置中止，不再只進 meta.incomplete）
+- **R02：`dmx` 一律拆行後逐行重算**（`dmxCalc(p, dmg, fixedVfx)`）——`_gmax` 行＝450＋`MAX_GMAX_MOVE` 屬性、
+  `_dmax` 行＝350＋快招屬性，不再發生 G-Max 物種的 `_dmax` 行繼承 450／專屬屬性的複本污染；
+  每行 `dmx.mode` 揭露 `'gmax'`（專屬招式、屬性固定，含蒼響／藏瑪然特）或 `'dmax'`（快招屬性），
+  前端依 mode 分流「極巨戰招式」區塊文案
 - 極巨攻擊威力隨技能等級：一般 L1/2/3＝250/300/350、G-Max＝350/400/450；Max+ 再 +100（450/550）。
   兩者每階差距同為 +100 → 以 **L3 尺度（350／450）** 估算，等位間相對排序不變；Max+ 假設在詳細頁揭露
 - 極巨條由招式命中累積（快招較有效率）、不隨時間自動回復；估算法＝「滿一條 ≈ 25 次快招命中＋極巨招施放
   2.5 秒」（`core.js` `HITS_PER_METER`／`MAX_ATK_DUR_SEC`；GM VN_BM 模板 duration 一律 2500ms）。
   是否為精算模擬？**不是**——是可解釋的相對指標：`maxRate()` ＝ 威力 × STAB/屬性倍率 × 攻擊體質 ÷
-  (25×快招秒數＋2.5)，常數全池一致、不改變同池相對排名
+  (25×快招秒數＋2.5)，常數全池一致、不改變同池相對排名。
+  **R08 敏感度分析**（2026-11-06）：N∈{15,20,25,30,35} 五組重算，`dmx.pct≥90` 成員 17 筆完全相同
+  → 門檻判定不隨 N 變動，只需揭露假設（`core.js` 註記已加）
 - `dmx.dps` 為相對指標；百分位 (`dmx.pct`) 的分布＝全部可極巨化／超極巨化行（攻手池）；
   前端另列極巨攻擊屬性與威力假設揭露
 
@@ -221,7 +241,7 @@ base 行是 PvPoke 模擬殘留，不建行。
 1. 結構完整性（1718 型態欄位、verdict、dex 範圍）
 2. 圖示命中（uicons 未收錄 → 改用 PokeAPI 全國圖鑑圖，記為警告；有檔名但檔不存在 → 錯誤）
 3. 排行資料範圍
-4. 評級邏輯自洽（不可傳送類不得落入 tier3；tier0 有一致的正當事由白名單——tp≥97／無極汰那專案）
+4. 評級邏輯自洽（不可傳送類不得落入 tier3；tier0 有一致的正當事由白名單——tp≥97 等；無極汰那 R07 起為 tier1 傳說模板）
 5. 暗影型態風險清點（火箭隊輪替，再取得不易）：**暗影高價值型態不得判可傳送的阻擋規則**
    （PvP 可得前 150／PvE 全榜前 10%／屬性分榜前 10% 暗影 → tier3 即 fail）
 6. 關鍵物種抽查

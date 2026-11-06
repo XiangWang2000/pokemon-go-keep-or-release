@@ -115,7 +115,9 @@
   // - 極巨招式威力隨等級：一般 L1/2/MAX!=250/300/350（Max+ 450）；G-Max 350/400/450（Max+ 550）
   // - 極巨條由快招／蓄力招命中累積（快招較有效率）；估算法：以「每次快招命中集能速度相同」為
   //   假設 → 每次滿條所需快招次數為共用常數 HITS_PER_METER，只有快招快慢影響集條時間。
-  //   HITS_PER_METER 是相對尺度常數，不改變池內相對排名（所有物種同值）。
+  //   HITS_PER_METER 是相對尺度常數，只有快招快慢影響集條時間；不影響「攻手池前 10%（pct≥90）」
+  //   的成員與排名（R08 敏感度分析，2026-11-06：N=15/20/25/30/35 五組重算，pct≥90 成員 17 筆完全相同）。
+  //   N 只改動 dps 絕對值尺度，不改變池內相對排名（所有物種同值）。
   var MAX_ATK_DUR_SEC = 2.5;   // 極巨攻擊施放時間（GM：VN_BM 模板 durationMs=2500）
   var HITS_PER_METER = 25;    // 假設常數：滿一條極巨條 ≈ 25 次快招命中
   function maxRate(input) {
@@ -125,16 +127,22 @@
   }
 
   /* ---------- 複製遊戲搜尋字串 ---------- */
-  // rows：篩選出的型態 [{dex, shadow(bool), max(bool)}]（純資料，無 DOM）
+  // rows：篩選出的型態 [{dex, id, shadow(bool), max(bool)}]（id／shadow／max 純資料，無 DOM）
+  // dbRows：**整個資料庫**的型態 [{dex, id, keep(bool), shadow, max}]（R03）。
+  //   keep＝「非明確可傳送」（tier 0/1/2）；GO 用編號搜尋會一次選中該編號『全部符合限定詞的形態』，
+  //   名單（篩選結果）可能不含同編號的保留個體——只比對篩選名單會漏掉它們。
   // 回傳 { text, qualified('shadow'|'dynamax'|null), mixedDexes:[], tooLong }
   // - 形態限定詞：全部暗影行 → 每段補 &shadow（只選中暗影個體）；全部可極巨行 → &dynamax
-  // - mixedDexes：同圖鑑號在名單內含「形態不同」的行——遊戲搜尋會一次選中同號全部形態
-  //   （暗影／極巨化／一般個體無法用編號區分），呼叫端必須對這些號碼提出「不可直接全選傳送」警告
-  function searchPlan(rows) {
+  // - mixedDexes 兩類來源：
+  //   (a) 名單內同編號混有不同形態類（暗影／極巨化／一般，無法用編號區分）
+  //   (b) R03：名單外、但會被這個搜尋選中的同編號「保留個體」（限定詞會被一起套上，
+  //       所以暗影名單只看暗影保留個體、dynamax 名單只看可極巨保留個體、無限定詞全都算）
+  //       ——呼叫端必須對這些號碼提醒「不可用編號全選傳送」
+  function searchPlan(rows, dbRows) {
     var dexes = [];
     var seen = {};
     var allShadow = true, allMax = true;
-    var groups = {}; // dex -> Set(class) class = 'shadow'|'max'|'normal'
+    var groups = {}; // dex -> {class: true}  class = 'shadow'|'max'|'normal'
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (!seen[r.dex]) { seen[r.dex] = true; dexes.push(r.dex); }
@@ -144,26 +152,45 @@
       (groups[r.dex] = groups[r.dex] || {})[cls] = true;
     }
     dexes.sort(function (a, b) { return a - b; });
+    var qual = allShadow ? 'shadow' : (allMax ? 'dynamax' : null);
     var parts = [];
     for (var j = 0; j < dexes.length;) {
       var k = j;
       while (k + 1 < dexes.length && dexes[k + 1] === dexes[k] + 1) k++;
       var seg = dexes[j] === dexes[k] ? String(dexes[j])
         : (dexes[j] + 1 === dexes[k] ? dexes[j] + ',' + dexes[k] : dexes[j] + '-' + dexes[k]);
-      if (allShadow) seg += '&shadow';
-      else if (allMax) seg += '&dynamax';
+      if (qual === 'shadow') seg += '&shadow';
+      else if (qual === 'dynamax') seg += '&dynamax';
       parts.push(seg);
       j = k + 1;
     }
     var text = parts.join(',');
+    // (a) 名單內同號不同形態類
     var mixedDexes = [];
+    var seen2 = {};
     for (var m = 0; m < dexes.length; m++) {
       var g = groups[dexes[m]];
-      if (Object.keys(g).length > 1) mixedDexes.push(dexes[m]); // 名單內同號不同形態
+      if (Object.keys(g).length > 1) { mixedDexes.push(dexes[m]); seen2[dexes[m]] = true; }
+    }
+    // (b) R03：名單外保留個體被同名搜尋選中
+    if (dbRows) {
+      var selIds = {};
+      for (var s = 0; s < rows.length; s++) selIds[rows[s].id] = true;
+      var planDex = seen; // dex -> true（名單內編號）
+      var risky = {};
+      for (var b = 0; b < dbRows.length; b++) {
+        var d = dbRows[b];
+        if (!planDex[d.dex] || selIds[d.id] || !d.keep) continue;
+        if (qual === 'shadow' && !d.shadow) continue;  // &shadow 只選中暗影
+        if (qual === 'dynamax' && !d.max) continue;    // &dynamax 只選中可極巨化
+        risky[d.dex] = true;
+      }
+      for (var rk in risky) if (!seen2[rk]) mixedDexes.push(+rk);
+      mixedDexes.sort(function (a, b2) { return a - b2; });
     }
     return {
       text: text,
-      qualified: allShadow ? 'shadow' : (allMax ? 'dynamax' : null),
+      qualified: qual,
       mixedDexes: mixedDexes,
       tooLong: text.length > 900,
     };
