@@ -4,7 +4,9 @@
  * 用法：node tools/audit_data.js
  */
 const fs = require('fs');
-const d = JSON.parse(fs.readFileSync('site/data/data.json', 'utf8'));
+// argv[2] 可指定資料檔路徑（預設 site/data/data.json）——test_integration.js 用它做
+// 「反向稽核」：注入假的高價值暗影 tier3，驗證本檔確實會以非零退出碼攔截（R04）
+const d = JSON.parse(fs.readFileSync(process.argv[2] || 'site/data/data.json', 'utf8'));
 const uicons = new Set(JSON.parse(fs.readFileSync('data/uicons_filelist.json', 'utf8')));
 
 let errors = 0;
@@ -50,9 +52,11 @@ for (const f of d.forms) {
   const proto = t.includes('legendary') || t.includes('wildlegendary') || t.includes('mythical') || t.includes('ultrabeast') || t.includes('regional');
   const special = f.megas || f.dmg || proto;
   if (f.verdict.tier === 3 && special) risk.push(f.id);
-  // tier 0 必須有正當理由
+  // tier 0 必須有正當理由（含新的屬性分榜保護、無極汰那專案、PvE tp 分榜）
   if (f.verdict.tier === 0) {
-    const hasReason = f.megas || f.dmg || t.includes('mythical') || (f.pvp && Object.values(f.pvp).some(r => r && r.r <= 50)) || (f.pve && f.pve.pct >= 97);
+    const tpTop = f.pve && f.pve.tp ? Object.values(f.pve.tp).some(p => p >= 97) : false;
+    const hasReason = f.megas || f.dmg || t.includes('mythical') || f.id === 'eternatus'
+      || (f.pvp && Object.values(f.pvp).some(r => r && r.r <= 50)) || (f.pve && f.pve.pct >= 97) || tpTop;
     if (!hasReason) err('必留但無正當事由: ' + f.id);
   }
 }
@@ -79,7 +83,33 @@ console.log('\n== 5. 暗影型態風險清點（火箭隊輪替，再取得不�
 const shadowT3 = d.forms.filter(f => (f.tags || []).includes('shadow') && f.verdict.tier === 3);
 const shadowTotal = d.forms.filter(f => (f.tags || []).includes('shadow')).length;
 console.log(`  暗影總數 ${shadowTotal}，其中被判「可傳送」${shadowT3.length}`);
-console.log('  樣本:', shadowT3.slice(0, 10).map(f => `${f.id}(#${(f.pvp[f.verdict.tier ? 1500 : 0] || {}).r || '—'})`).join(' '));
+console.log('  樣本:', shadowT3.slice(0, 10).map(f => `${f.id}(PvP#${[500, 1500, 2500, 10000].map(L => f.pvp[L] && f.pvp[L].r).filter(v => Number.isFinite(v)).sort((a, b) => a - b)[0] || '—'})`).join(' '));
+// L04：暗影高價值誤判阻擋——暗影再取得不易，戰力榜前段／PvE 前 10%（或屬性分榜前 5%）
+// 的暗影不得被判「可傳送」（會直接造成誤放生）
+const shadowRisk = shadowT3.filter(f => {
+  // R04：排序前先過濾 null／undefined（null 會在 (a,b)=>a-b 排序時被當 0，造成假陽性）
+  const bestPvP = [500, 1500, 2500, 10000].map(L => f.pvp[L] && f.pvp[L].r).filter(v => Number.isFinite(v)).sort((a, b) => a - b)[0];
+  const tpVals = f.pve && f.pve.tp ? Object.values(f.pve.tp).filter(v => Number.isFinite(v)) : [];
+  // R04：「任一屬性分榜很強」＝最大值，不是最小值（min 會把有隻頂尖屬性的暗影當成沒有）
+  const tpTop = tpVals.length ? Math.max(...tpVals) : null; // 無 tp 資料 → null（不算）
+  return (bestPvP != null && bestPvP <= 150) || (f.pve && f.pve.pct >= 90) || (tpTop != null && tpTop >= 95);
+});
+if (shadowRisk.length) err('暗影高價值型態被判可傳送（誤放生風險）: ' + shadowRisk.map(f => f.id + '(PvP#' + ([500, 1500, 2500, 10000].map(L => f.pvp[L] && f.pvp[L].r).filter(v => Number.isFinite(v)).sort((a, b) => a - b)[0] || '—') + ')').join(', '));
+else ok(`無暗影高價值型態落入可傳送（${shadowT3.length} 筆可傳送暗影全部經查為低戰力）`);
+// L04：拆分行（_dmax/_gmax）的極巨攻擊tp屬性覆蓋：G-Max 拆分行必須有專屬招式屬性
+const gmaxNoTp = d.forms.filter(f => f.dmg && f.dmx && !f.dmx.tp);
+const dmNoTp = d.forms.filter(f => f.dm && f.dmx && !f.dmx.tp);
+if (gmaxNoTp.length) err('超極巨化行缺專屬招式屬性: ' + gmaxNoTp.join(', ')); else ok('超極巨化行全部有專屬招式屬性');
+if (dmNoTp.length) err('極巨化行缺極巨攻擊屬性: ' + dmNoTp.join(', ')); else ok('極巨化行全部有極巨攻擊屬性');
+// L04/M12：meta 撈取日與 incomplete 標記——來源缺口應可追蹤
+if (d.meta && d.meta.incomplete && d.meta.incomplete.length) warn('meta.incomplete: ' + d.meta.incomplete.join('；'));
+else ok('meta.incomplete 無來源缺口');
+const fch = (d.meta || {}).fetched || {};
+const cupAge = d.cupFetched ? Math.round((Date.now() - new Date(d.cupFetched).getTime()) / 86400000) : null;
+console.log(`  來源撈取日: go_gm=${fch.go_gm || '未記錄'} cups=${d.cupFetched || '未記錄'}（${cupAge != null ? cupAge + ' 天前' : '未記錄'}） max_list=${fch.max_list || '未記錄'}`);
+if (cupAge != null && cupAge > 45) warn(`盃賽榜已 ${cupAge} 天未更新（>45 天，GBL 半個賽季）——build 端已停用「限制盃人選」評級升級（R09）；重跑 node tools/fetch_cup_rankings.js 恢復`);
+if (cupAge != null && cupAge <= 45) ok(`盃賽榜 ${cupAge} 天前撈取（≤45 天，仍屬現行賽季）`);
+if (!fch.go_gm || !fch.max_list) warn('有來源缺撈取日（舊版腳本未記錄）；重跑 fetch 工具後應完整');
 
 console.log('\n== 6. 關鍵物種抽查 ==');
 const spot = ['mewtwo', 'metagross_shadow', 'azumarill', 'medicham', 'registeel', 'gastrodon', 'rattata', 'litwick', 'sinistcha', 'poltchageist'];

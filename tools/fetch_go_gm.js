@@ -1,7 +1,9 @@
 /*
- * fetch_go_gm.js — 下載 PokéMiners latest GAME_MASTER，抽出兩份小資料：
+ * fetch_go_gm.js — 下載 PokéMiners latest GAME_MASTER，抽出三份小資料：
  *   1. PvE 招式數據（Vxxxx_MOVE_X.moveSettings：power/durationMs/energyDelta）
  *   2. 進化方向（pokemonSettings.evolutionBranch：物種 → 下游進化清單）
+ *   3. 極巨招式（VN_BM_*：Max/G-Max 招式官方屬性與施放時間——極巨攻擊屬性、
+ *      超極巨招式專屬屬性、蒼響／藏瑪然特／無極汰那專屬 Max 招式，資料全在此）
  * 輸出 data/go_gm.json（小檔），原始 19MB 大檔不保存。
  * 用法：node tools/fetch_go_gm.js
  */
@@ -72,11 +74,24 @@ const fs = require('fs');
     }
   }
 
-  const out = { moves, evo };
+  // ---- 3. 極巨招式（VN_BM_*：每型一招；vfxName 是唯一可讀鍵 max_flare / gmax_wildfire / max_behemoth_blade …）----
+  // power 在 GM 恆為 0（威力隨 Max Move 等級，PvP 顯示層另有常數）→ 建置端按等級表用
+  const maxMoves = {};
+  for (const e of raw) {
+    const s = e.data && e.data.moveSettings;
+    if (!s || !/^VN_/.test(e.templateId || '') || !s.vfxName) continue;
+    maxMoves[s.vfxName] = {
+      type: (s.pokemonType || '').replace('POKEMON_TYPE_', '').toLowerCase(),
+      durationMs: s.durationMs,
+    };
+  }
+
+  const out = { moves, evo, maxMoves, gmFetched: new Date().toISOString().slice(0, 10) };
   fs.writeFileSync('data/go_gm.json', JSON.stringify(out));
   const hasFrenzy = moves.FRENZY_PLANT;
   console.log('PvE 招式:', Object.keys(moves).length,
     'FRENZY_PLANT:', JSON.stringify(hasFrenzy));
   console.log('進化關係:', Object.keys(evo).length, '物種');
+  console.log('極巨招式:', Object.keys(maxMoves).length, '（Max 攻擊 18 + G-Max 專屬 + 特例)');
   console.log('少量抽樣:', Object.entries(evo).filter(([k]) => ['honedge', 'doublade', 'poltchageist', 'shellos'].includes(k)).map(([k, v]) => k + '→' + v).join(' | '));
 })().catch(e => { console.error(e.message); process.exit(1); });

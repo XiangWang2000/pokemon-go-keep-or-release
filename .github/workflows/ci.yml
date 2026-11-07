@@ -1,0 +1,48 @@
+# CI（L05）：PR 與主分支推送時必跑——建置可重現、測試全綠、快取 hash 冪等。
+# 部署（gh-pages subtree push）仍為人工手動操作，CI 不做任何部署動作。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安裝依賴（本專案僅原生 node，無外部依賴）
+        run: npm install --no-audit --no-fund
+
+      - name: 核心單元測試＋資料稽核（npm test = test_core + audit_data）
+        run: npm test
+
+      - name: 資料建置可重現（重跑 build 後不得產生 diff）
+        run: |
+          node tools/build_data.js
+          git diff --exit-code -- site/data/data.json
+
+      - name: 快取版本 hash 冪等（重跑 bump 後不得產生 diff）
+        run: |
+          node tools/bump.js
+          git diff --exit-code -- site/index.html site/js/app.js
+
+      - name: 語法檢查（全部入站 JS）
+        run: |
+          node --check site/js/core.js
+          node --check site/js/app.js
+          node --check tools/build_data.js
+          node --check tools/audit_data.js
+          node --check tools/test_core.js
+          node --check tools/parse_max.js
+          node --check tools/html_to_md_max.js
+          node --check tools/bump.js
+          node --check tools/diff_tiers.js
+          node --check tools/fetch_go_gm.js
+          node --check tools/fetch_cup_rankings.js

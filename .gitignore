@@ -8,3 +8,7 @@ pvpoke_rankings_page.html
 
 # 內部檢討筆記，不上公開 repo
 PROJECT_RETROSPECTIVE_2026-10-25.md
+
+# 建置快照／可重現來源（不入 repo）
+data/_max_db.md
+data/_baseline_v25.json
