@@ -15,7 +15,7 @@
  *          特殊參戰者兩者皆不適用（無限定詞＋warning）
  *   - R10：parse_max 合併語意——先 D-Max 後 G-Max 也能補上 dmg（順序反轉不變）
  * 用法：node tools/test_integration.js（需先 node tools/build_data.js）
- * 目前 40 項。
+ * 目前 62 項。
  */
 const fs = require('fs');
 const os = require('os');
