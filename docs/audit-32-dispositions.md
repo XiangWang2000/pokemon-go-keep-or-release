@@ -255,3 +255,98 @@ dev server（`python -m http.server 8601 --directory site`）：① console 0 er
 ② R06 三種「極巨戰招式」分流文案（_gmax 專屬超極巨招式／_dmax 快招屬性／蒼響專屬 Max 招式鋼屬固定）；
 ③ R03 名單外保留個體警告（#45 名單外列出「霸王花（暗影）」）；④ modal 手機可用（.modalbox max-height 80vh＋可捲動）、
 頁面無水平溢位、`@media` 斷點存在。
+
+---
+
+# 第三輪審查（issue #3，R15–R20）逐項處置表
+
+基準：`d0eaceb`（2026-11-07 審查）。外部來源核實日期 2026-11-07。
+
+### R15 R05 修正時把一般屬性蓄力招也排除出全域 PvE 最佳 — **confirmed（P0）**
+
+- 位置：`tools/build_data.js` pveCalc。`if (cType === 'normal') continue` 放在 `pveCycle`／`best` 更新之前，
+  一般屬性蓄力招整組被排除：只有一般屬性蓄力招的物種 `best` 恒 null（本資料集無此極端案例）；
+  其他物種被迫選次佳組合（回歸案例 Porygon-Z：`LOCK_ON/SOLAR_BEAM` dmg 20.4）。
+- 修正：中性盤面 `pveCycle` 與 `best` 更新**一律執行**，僅在生成 `tpBest[normal]`（×1.6 弱點分榜）時跳過——
+  R05 的「一般屬性不上屬性分榜」與 R15 的「一般屬性參與全域最佳」分流開。
+- 反向測試（`tools/test_integration.js` R15 區塊）：手算錨點 LOCK_ON（2 威力／0.5s／＋10 能，STAB ×1.2）
+  集 100 能 10 擊（5s）→ Hyper Beam（150／4s／-100，STAB 180 傷害）→ (10×2.4＋180)/(5＋4)=204/9=22.6667；
+  斷言 `porygon_z.pve.c==='HYPER_BEAM'` 且 `pve.dps=22.67`。修正前建置必失敗（實測：仍是 SOLAR_BEAM/20.4）。
+  R05 三條反向斷言保留（tp 無 normal 鍵）。
+- 重建核查：Porygon-Z dmg 20.4→22.67（pct 75.2→82.2），程式規則下仍 t3（PvE 非前 10%、
+  無 PvP 前 50 名的事實不變）——reviewer 亦要求不以此斷言 tier，僅登記核算結果；
+  regigigas／regigigas_shadow dmg 17.94→28.52（CRUSH_GRIP／GIGA_IMPACT 族重獲資格）→ pct 98.6/99.3 → t0。
+
+### R16 蒼響（劍之王）／藏瑪然特（盾之王）／無極汰那被當成「可 Dynamax」 — **confirmed（P0）**
+
+- 核實：官方 Crowned Energy 形態轉換公告——兩者「可參加 Max Battles despite not being able to
+  Dynamax or Gigantamax」；Bulbapedia Max Battle 條目同列 Eternatus 不能 Dynamax、以專屬招式代替 Max Attack；
+  Serebii Max Battles 欄威力：Behemoth Blade／Bash＝鋼 250/300/350（Max+ 450）→ **D-Max 尺度 350**、
+  Dynamax Cannon＝龍 350/400/450（Max+ 550）→ **G-Max 尺度 450**。
+- 修正：`dmx.mode='dmax'|'gmax'|'special'` 三類（special＝不會變身的存在能力，僅代表「可參戰 Max Battle」）；
+  `MAX_FIXED_MOVE` 改帶 `{vfx, power}`（350／450）、eternatus 加入（`max_dynamax_cannon`，GM 龍屬 vfx 已存在）；
+  前端：徽章「特」＋title、標籤「Max 特殊參戰（不能 Dynamax）」、Max Block／估算表專屬文案（Dynamax Cannon／
+  Behemoth Blade／Bash 依物種分流）、`dmax` 篩選器排除 special。
+- 測試（test_integration R16）：三隻 dm=true/dmg 空、mode=special、tp steel/steel/dragon、
+  dmx.dps 依 350/350/450 以 CORE.maxRate 手算相等。
+- 第二輪 R06/R07 區塊按新正確規則改寫（不被鎖在舊錯誤）。
+
+### R17 無極汰那「2026 回歸可再捕」降級理由錯誤 — **confirmed（P0，推翻第二輪 R07 部分）**
+
+- 核實：官方 Dynamax Trails 2026 公告「Featured Pokémon and Rewards」——
+  GO Pass 給 encounter；已捕過的帳號 "An encounter with Eternatus, or 100 Eternatus Candy if you have
+  already caught Eternatus"——**每帳號只能捕獲一次**，2026 活動對已捕者是 100 糖而非第二隻遭遇；
+  「每次活動限一隻／回歸可再捕」表述不成立。
+- 修正：judge eternatus 分支改寫——tier1 撤銷，回 **tier0**（取得稀少性＋大師聯盟 #10 的 `b.r≤50 → tier0`
+  一般規則一致，解除與一般規則相牴觸）；理由三條：①每個帳號只能捕獲一次（首發＋補捕＋100 糖揭句）
+  ②Max Battle 特殊參戰者：不能 Dynamax，攻擊＝專屬 Dynamax Cannon（龍、G-Max 威力級）＋場外全隊 Max 招升 1 級效果
+  ③大師聯盟排行第 10 名（PvP 實證）。
+- 反向測試（test_integration R17）：tier=0、`/每個帳號只能捕獲一次/`、`/已捕帳號改發 100/`、
+  `!/回歸可再捕/`、`!/每次活動限一隻/`、`/大師聯盟排行第/`。修正前必失敗（實測 tier1）。
+
+### R18 `&dynamax` 不能代表全部 Max 參戰者 — **confirmed（P1）**
+
+- 核實：官方搜尋 FAQ＋GO Hub——`dynamax` 只查 D-Max、`gigantamax` 只查 G-Max、特殊參戰者兩者皆不適用。
+- 修正：`searchPlan(rows, dbRows)` 形態欄位改 `mx: 'dmax'|'gmax'|'special'|null`（相容舊 `max:true`）；
+  全 D-Max → `&dynamax`、全 G-Max → `&gigantamax`（新增）、含 special 或 D/G 混合 → 不補任何限定詞
+  並回傳 `warning`（明示「沒有任何一個字串能只選中這份名單，請逐隻複核」，不給誤導性承諾）；
+  R03 名單外檢查按 qualifier 對應類別過濾（gigantamax 名單不被同編號 D-Max 保留個體誤觸發）。
+  `app.js` copyList／dbRows、警告 modal（三關鍵字＋特殊說明、純 warning 也可顯示）同步。
+- 測試：test_core＋test_integration 各加三種——G-Max-only（含 dbRows 名單外 D-Max 保留不算選中）、
+  D＋G 混合、特殊參戰者（含 special+dmax），另測舊欄位相容。
+
+### R19 PR #1 描述是過期數據 — **confirmed（P2）**
+
+- PR 描述舊值（141 筆／0 轉可送／284/341/801/292）已過期。重建後以 GitHub API 更新為本輪數字
+  （134 筆 vs 修正前基準、3 筆轉可送 280→282/338/797/301、vs-HEAD 5 筆）＋雙基準文件連結。
+
+### R20 Max Meter 常數「不改變相對排名」註解過度斷言 — **confirmed（P2）**
+
+- 修正：`site/js/core.js` 註解收斂——`A/(N·t＋2.5)` 分母含快招時間，**快招時間不同的物種其相對順序
+  與百分位可能隨 N 翻轉**；已實證的只有「攻手池前 10%（pct≥90）成員集合」在 N=15/20/25/30/35 穩定
+  （R08，17 筆一致）；其餘順位／百分位不宣稱。
+
+## 第三輪升降級雙基準複核
+
+- vs HEAD（`d0eaceb`）：**5 筆**（`docs/tier-diff-2026-11-07-vs-prev.md`）：
+  regigigas／regigigas_shadow t1→t0（R15 正效應：CRUSH_GRIP 重獲全域資格，dmg 17.94→28.52、pct 98.6/99.3）；
+  eternatus t1→t0（R17 翻案，預期內）；salamence_shadow t0→t1（pct 97→96.9 分界，dmg 不變、
+  池整體上移，仍屬保留類）；gothitelle_shadow t1→t2（pct 90→89.8 分界，tp 特性通道仍在，保留類）。
+  後兩筆皆為 97/90 分界線上 0.1–0.2% 的池位移，無誤放生風險；**0 筆轉可傳送**。
+- vs `97ed136`（修正前基準）：134 筆（3 筆轉可送＝porygon 族、81 筆防護升級、50 筆其餘）——
+  與第二輪報告同源，僅 R15 引入的池位移差（`docs/tier-diff-2026-11-07.md`）。
+- 回歸：`npm test`（core＋integration＋audit）全綠；build 282/338/797/301；bump 冪等重跑零 diff。
+
+## 第三輪瀏覽器 smoke
+
+dev server：① console 0 error；② eternatus 徽章「特」＋title「Max 特殊參戰者：可參加 Max Battle，
+但不能 Dynamax」、標籤列「Max 特殊參戰（不能 Dynamax）」；③ eternatus 詳情卡 Max Block＝
+「極巨攻擊〈龍〉Max Battle 專屬招式（Dynamax Cannon，屬性固定）」＋不能 Dynamax 說明；
+④ copyList 特殊參戰者名單 → mixWarn modal 顯示「無法用單一搜尋字串可靠表示……請逐隻挑選」警告。
+
+## 第三輪未解限制（追加）
+
+8. **特殊參戰者威力級**：蒼響／藏瑪然特依 D-Max 尺度 350、無極汰那依 G-Max 尺度 450 估算（Serebii Max Battles
+   欄實值），此為專屬招式的「獨立威力表」以最接近尺度近似；Max+（+100）同揭露假設。
+9. **搜尋字串能力極限**：`dynamax`／`gigantamax` 與特殊參戰者的交集無法用單一字串可靠表示——
+   名單含 special 或 D/G 混合時僅純編號（無限定詞）＋警告文案，要求逐隻複核（官方關鍵字語意所限，非工具 bug）。

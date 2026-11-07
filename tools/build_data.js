@@ -382,13 +382,16 @@ function pveCalc(p) {
     const fStab = stag(getGoMove(fc.id).type);
     for (const c of charged) {
       const cType = getGoMove(c.id).type;
-      if (cType === 'normal') continue; // R05：普通屬性對任何屬性都沒有效果絕佳——×1.6 弱點分榜不成立
-                                        // （一般屬性打手的強度由全域單榜以中性評價，不作屬性絕活保護）
       const cStab = stag(cType);
       const cyc = CORE.pveCycle(fc, c, fStab, cStab);
       if (cyc == null) continue;
-      // 中性盤面
+      // R15：中性盤面一律計算——一般屬性蓄力招（Hyper Beam／Tri Attack 等）對中性
+      //       boss 是合法組合，能否有 ×1.6 弱點分榜不影響全域最佳招式選擇
+      //       （回歐案例：Porygon-Z 修正前被迫選次佳組合、dps 20.4 → 修正後 22.67）
       if (!best || cyc > best.dps) best = { dps: cyc, f: fc.id, c: c.id };
+      // R05：普通屬性對任何屬性都沒有效果絕佳——×1.6 弱點分榜不成立，不上屬性分榜
+      //       （一般屬性打手的強度由全域單榜以中性評價；只跳過這一步，不跳過上面）
+      if (cType === 'normal') continue;
       // 弱點盤面：蓄力命中 ×1.6；快招與蓄力同屬性（＝boss 對 cType 弱點）時，
       // 同屬性快招的弱點加成不會被 boss 第二屬性吸收（弱點不會消失）→ 同步 ×1.6；
       // 其他快招保持中性（第二屬性未知，取期望中性）
@@ -440,30 +443,34 @@ const MAX_GMAX_MOVE = {
   toxtricity_amped: 'gmax_stun_shock', toxtricity_low_key: 'gmax_stun_shock',
   grimmsnarl: 'gmax_snooze',
 };
-// R06：蒼響／藏瑪然特＝真 Dynamax（非超極巨）、Max 招式為「專屬鋼屬招式」且威力是
-// D-Max 級 250/300/350（2026-11-05 核實：PokéBase／Pokétory Max 技能表；GM vfx 已實錄）——
-// 不能用「快招屬性」的一般極巨攻擊規則建模
+// R16：特殊 Max 參戰者——官方 Crowned 能量公告明寫：Crowned Sword Zacian／Crowned Shield
+// Zamazenta「可參加 Max Battles despite not being able to Dynamax or Gigantamax」，
+// Max Battle 攻擊槽使用專屬招式（威力隨技能等級，且不同於 D/G 兩級的一般威力表）：
+//   Behemoth Blade／Bash＝鋼屬 250/300/350（Max+ 450）→ 依 D-Max 尺度 L3＝350 估
+// （2026-11-07 核實：Serebii GO 招式表 Max Battles 欄、Bulbapedia Max Battle、 PokéBase Max 技能表）
 const MAX_FIXED_MOVE = {
-  zacian_crowned_sword: 'max_behemoth_blade',
-  zamazenta_crowned_shield: 'max_behemoth_bash',
+  zacian_crowned_sword: { vfx: 'max_behemoth_blade', power: 350 },
+  zamazenta_crowned_shield: { vfx: 'max_behemoth_bash', power: 350 },
+  eternatus: { vfx: 'max_dynamax_cannon', power: 450 }, // Dynamax Cannon＝龍屬、350/400/450（Max+ 550）→ 依 G-Max 尺度 450 估
 };
 const dmxMissingGmax = [];
 // R02：拆行後逐行呼叫——mode 參數決定威力級與屬性來源：
-//   dmg＝G-Max（威力級 450＋MAX_GMAX_MOVE 專屬招式）；fixedVfx＝R06 專屬招式（D-Max 級 350）；
-//   兩者皆無＝一般 D-Max（威力級 350、屬性＝快招屬性、逐快招取最佳）
-function dmxCalc(p, dmg, fixedVfx) {
+//   dmg＝G-Max（威力級 450＋MAX_GMAX_MOVE 專屬招式）；fixed＝R16 特殊參戰者專屬招式
+//   （.each 行自帶威力級：蒼響類 350、eternatus 450）；兩者皆無＝一般 D-Max（威力級 350、屬性＝快招屬性）
+function dmxCalc(p, dmg, fixed) {
   const atkStat = (p.baseStats.atk + 15) * CPM_L40;
   const stag = t => (p.types && p.types.includes(t)) ? 1.2 : 1.0;
   const fastRaw = (p.fastMoves || []).map(id => ({ id, m: getGoMove(id) }))
     .filter(x => x.m && x.m.power > 0 && x.m.energyDelta > 0);
   if (!fastRaw.length) return null;
-  if (fixedVfx || dmg) {
-    const vfx = fixedVfx || MAX_GMAX_MOVE[p.speciesId];
+  if (fixed || dmg) {
+    const vfx = fixed ? fixed.vfx : MAX_GMAX_MOVE[p.speciesId];
+    const power = fixed ? fixed.power : 450;
     const mm = vfx && goGm.maxMoves && goGm.maxMoves[vfx];
     if (!mm) { dmxMissingGmax.push(p.speciesId); return null; }
     const dur = Math.min(...fastRaw.map(x => x.m.durationMs)) / 1000;
-    const rate = CORE.maxRate({ power: fixedVfx ? 350 : 450, multiplier: stag(mm.type), atkStat, fastDurSec: dur });
-    return { dps: +rate.toFixed(2), tp: mm.type, fixed: fixedVfx ? true : undefined };
+    const rate = CORE.maxRate({ power, multiplier: stag(mm.type), atkStat, fastDurSec: dur });
+    return { dps: +rate.toFixed(2), tp: mm.type, fixed: fixed ? true : undefined };
   }
   // 一般 D-Max：極巨攻擊屬性＝快招屬性 → 逐一快招取最佳（威力 L3 350）
   let best = null;
@@ -552,10 +559,11 @@ for (const p of gm.pokemon) {
   //   單次可捕）且擁有專屬 Max 招式 Dynamax Cannon（龍屬、G-Max 威力級）→ 補標，
   //   並與蒼響／藏瑪然特／武道熊師同類（本體即極巨化，不拆行）
   const MAX_EXTRA = new Set(['melmetal']);
-  // MAX_SPECIAL：無極汰那不在 pokemondb 清單——由 GO Pass 期間限定取得（Max Finale 2025-08 首發、
-  // Dynamax Trails 2026-11 回歸可再捕），且本體即極巨化個體（無一般個體）→ 補標 dm。
-  // R07 核實：無極汰那是「一般 Dynamax」能力（極巨攻擊屬性=快招屬性，與其他 D-Max 相同）；
-  // 專屬的 Dynamax Cannon 是「蓄力招」＋場外冒險效果（Max 招全隊 +1 級），不是專屬 Max 招式。
+  // MAX_SPECIAL（R16）：無極汰那＝「特殊 Max 參戰者」——不在 pokemondb 極巨化清單，
+  // 本體即對戰個體（無一般可傳送個體）：GO Pass 期間限定取得（Max Finale 2025-08 首發）、
+  // 每帳號僅能捕獲一次（R17：2026-11 Dynamax Trails 起錯過者可經 GO Pass 補捕，
+  // 已捕帳號改發 100 Eternatus Candy、不再有第二次遭遇）。不能 Dynamax，
+  // Max 攻擊＝專屬招式 Dynamax Cannon（龍屬、G-Max 威力級）→ dmx.mode='special'。
   const MAX_SPECIAL = new Set(['eternatus']);
   if (maxData) {
     const mx = maxData[p.speciesId] || (MAX_EXTRA.has(p.speciesId) || MAX_SPECIAL.has(p.speciesId) ? {} : null);
@@ -572,10 +580,11 @@ for (const p of gm.pokemon) {
 // GO 中 Gigantamax 因子是獨立個體（一般個體未必有），且保留價值互不相關
 const isFormIcon = e => /^\d+_f\d+\.png$/.test(e.icon || ''); // GO 獨立形態圖（{dex}_f{n}.png）
 // 「極巨化本體＝形態／基礎種本身」的物種：GO 只有極巨化個體、無一般個體，
-// 不拆行（拆了就是幻影）。蒼響／藏瑪然特＝能量形態轉換（劍之王不巨大化但可參戰）；
-// 武道熊師＝GO 第一個「只發佈極巨化形態」的物種（Kubfu 只在 Max Battle 抓取，進化後保有極巨化能力）
+// 不拆行（拆了就是幻影）。蒼響／藏瑪然特＝能量形態轉換（R16：特殊 Max 參戰者——可參戰
+// Max Battle、不能 Dynamax，可否做形態轉換與對戰資格分列）；武道熊師＝GO 第一個
+// 「只發佈極巨化形態」的物種（Kubfu 只在 Max Battle 抓取，進化後保有極巨化能力）
 const MAX_BODY_FORMS = new Set(['zacian_crowned_sword', 'zamazenta_crowned_shield', 'urshifu_single_strike', 'urshifu_rapid_strike',
-  'eternatus']); // 無極汰那：GO Pass 取得個體全部可極巨化，無「一般僅能傳送」個體 → 本體即極巨化行
+  'eternatus']); // 無極汰那：GO Pass 取得個體全部可參戰 Max Battle，無「一般僅能傳送」個體 → 本體即參戰行
 const MAX_BODY_BASE = new Set(['kubfu']);
 if (maxData) {
   const gmaxExtra = [];
@@ -662,8 +671,8 @@ for (const e of all) {
 
 // ---------- 極巨戰攻擊估算（R02：拆行後逐行重算） ----------
 // 放在 G-Max／D-Max 拆行與超進化合併之後：每行只拿「屬於自己」的威力級與屬性來源——
-//   _gmax 行＝G-Max 級 450＋專屬招式屬性（MAX_GMAX_MOVE）；蒼響／藏瑪然特＝R06 專屬鋼屬（350）；
-//   其餘可極巨化行＝一般 D-Max 級 350＋快招屬性。舊版在拆行前只算一次，
+//   _gmax 行＝G-Max 級 450＋專屬招式屬性（MAX_GMAX_MOVE）；特殊參戰者＝R16 專屬招式
+//   （蒼響類 350／eternatus 450）；其餘可極巨化行＝一般 D-Max 級 350＋快招屬性。舊版在拆行前只算一次，
 //   G-Max 物種的 _dmax 拆分行會錯拿 450／專屬屬性（噴火龍／妙蛙花等）。
 {
   const gmById = new Map(gm.pokemon.map(p => [p.speciesId, p]));
@@ -674,8 +683,10 @@ for (const e of all) {
     if (!p) { dmxMissingGmax.push(e.id + '(找不到物種定義)'); continue; }
     const fixed = MAX_FIXED_MOVE[baseId];
     e.dmx = dmxCalc(p, !!e.dmg, fixed);
-    if (e.dmx && e.dm && !e.dmg && !fixed) e.dmx.mode = 'dmax';       // 一般 D-Max（快招屬性）
-    else if (e.dmx && (e.dmg || fixed)) e.dmx.mode = 'gmax';          // G-Max 級／蒼響藏瑪然特專屬招式
+    if (!e.dmx) continue;
+    if (e.dmg) e.dmx.mode = 'gmax';          // 超極巨化：專屬超極巨招式（G-Max 威力級 450）
+    else if (fixed) e.dmx.mode = 'special'; // R16：特殊參戰者——不能 Dynamax，Max 攻擊＝專屬招式
+    else e.dmx.mode = 'dmax';               // 一般 D-Max（快招屬性）
   }
   if (all.some(e => e.dmx)) {
     const dw = all.filter(e => e.dmx && e.dmx.dps > 0).map(e => e.dmx.dps).sort((a, b) => a - b);
@@ -834,14 +845,21 @@ function judge(e) {
     tier = 0;
     reasons.push('幻獸：來源稀少且無法交換，重複的也建議留著換 XL 糖果');
   } else if (e.id === 'eternatus') {
-    // 無極汰那（R07，2026-11-05 核實：Niantic 官方 Dynamax Trails 公告＋PokeMiners GM）：
-    // GO Pass 期間限定取得（Max Finale 2025-08 首發；Dynamax Trails 2026-11 起回歸、每次活動限一隻）；
-    // 具「一般 Dynamax」能力（極巨攻擊＝快招屬性的常規規則，非專屬 G-Max 招式）；
-    // 專屬的是「蓄力招」Dynamax Cannon（GM power 215／耗能 100）＋場外冒險效果——
-    // 舊版「專屬 Max 招式屬 G-Max 威力級（450）」的說法有誤，已修正
-    tier = 1;
-    reasons.push('傳說寶可夢：GO Pass 活動期間限定、每次活動單隻（2025-08 Max Finale 首發；2026-11 Dynamax Trails 回歸可再捕）——活動期間取得的所有個體都建議保留');
-    reasons.push('Dynamax Cannon（龍屬蓄力招）另有場外冒險效果：Max 招式全隊升 1 級 10 分鐘（5,000 星塵＋30 糖）；極巨戰中的極巨攻擊本身仍是快招屬性的一般極巨攻擊');
+    // 無極汰那（R16/R17，2026-11-07 核實：官方 Crowned Energy／Dynamax Trails 公告＋
+    // Serebii GO 招式表 Max Battles 欄＋Bulbapedia Max Battle）：
+    // • Max Battle 特殊參戰者：可以參戰但不能 Dynamax——極巨攻擊＝專屬招式 Dynamax Cannon
+    //   （龍屬、G-Max 威力級 350/400/450），不是快招屬性的一般極巨攻擊；
+    //   牠的 Dynamax Cannon 蓄力招在 PvP 也登場（vfx 威力 215／耗能 100），
+    //   場外另有效果（Max 招式全隊升 1 級 10 分鐘，5,000 星塵＋30 糖）
+    // • 取得：2025-08 Max Finale 隨 GO Pass 首次開放，每隻「帳號」只能捕獲一次——
+    //   2026-11 Dynamax Trails 期間錯過者可經 GO Pass 補捕；
+    //   已捕過的帳號改發 100 顆無極汰那糖果、不會有第二次遭遇（官方公告原文：
+    //   "An encounter with Eternatus, or 100 Eternatus Candy if you have already caught Eternatus"）
+    // 解除 R07 的 tier1 特案：rating 依「大師聯盟 #10」的一般規則（b.r≤50 → tier0），
+    // 只以取得稀少性補足說明，不再以錯誤的「回歸可再捕」前提降級
+    tier = 0;
+    reasons.push('傳說寶可夢：每個帳號只能捕獲一次（2025-08 Max Finale 首發；2026-11 Dynamax Trails 起錯過者可經 GO Pass 補捕，已捕帳號改發 100 顆糖果、不會有第二次遭遇）');
+    reasons.push('Max Battle 特殊參戰者：不能 Dynamax，極巨攻擊＝專屬招式 Dynamax Cannon（龍屬、G-Max 威力級）；此招式場外另有效果——Max 招式全隊升 1 級 10 分鐘（5,000 星塵＋30 糖）');
     rankReason(10000, 100) || rankReason(2500, 100);
   } else if (e.megas) {
     tier = 0;
@@ -972,8 +990,9 @@ for (const e of all) {
   if (e.dmx && e.dmx.pct >= DMX_ATTACKER_PCT) {
     e.verdict.tier = 1;
     const atkPct = Math.max(1, Math.round(100 - e.dmx.pct));
+    const poolName = e.dmx.mode === 'special' ? 'Max Battle 參戰型態（含特殊參戰者）' : '可極巨化型態';
     e.verdict.why = [
-      `Max Battle 強力攻手：極巨攻擊估算在可極巨化型態中排名前 ${atkPct}%——` +
+      `Max Battle 強力攻手：極巨攻擊估算在${poolName}中排名前 ${atkPct}%——` +
       'Max Battle 只有極巨化個體能出戰、輸出以極巨攻擊為主，這隻屬於要練的第一批' + regionalNote,
       '技能投資方向：快招集能快＋專屬極巨攻擊屬性即可；適用 IV 不用太挑（Power Spot 可重複遭遇）',
     ];
@@ -1053,7 +1072,8 @@ for (const e of all) {
   if (e.dmx.pct < DMX_ATTACKER_PCT) continue;
   if ((e.verdict.why || []).some(w => w && w.includes('Max Battle'))) continue; // 攻手升級行已有主理由
   const atkPct = Math.max(1, Math.round(100 - e.dmx.pct));
-  e.verdict.why.push(`Max Battle 攻手：極巨攻擊估算在可極巨化型態中排名前 ${atkPct}%（Max Battle 的攻擊衡量尺度，與上面所據不同）`);
+  const poolName = e.dmx.mode === 'special' ? 'Max Battle 參戰型態（含特殊參戰者）' : '可極巨化型態';
+  e.verdict.why.push(`Max Battle 攻手：極巨攻擊估算在${poolName}中排名前 ${atkPct}%（Max Battle 的攻擊衡量尺度，與上面所據不同）`);
 }
 
 // ---------- 小小盃次級註記 ----------

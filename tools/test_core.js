@@ -53,21 +53,51 @@ ok(rBest.cp <= 1500, 'ivRank 返回 CP 不超過上限');
 const rs = core.ivRank(form, [15, 15, 15], 1500, true);
 ok(rs && rs.rank >= 1 && rs.level >= 1, 'ivRank 暗影 Judge 參數可用');
 
-/* ---------- 4. 複製搜尋字串（H07） ---------- */
+/* ---------- 4. 複製搜尋字串（H07＋R18） ---------- */
+// rows 的形態欄位 mx：'dmax'（一般 D-Max）／'gmax'（超極巨化）／'special'（特殊 Max 參戰者）
+// R18（官方搜尋 FAQ／GO Hub）：dynamax 只查 D-Max；gigantamax 只查 G-Max；
+// 特殊參戰者兩者都不適用——混合情況無法用單一搜尋字串可靠表示 → 不補限定詞並附 warning
 // 全暗影 → 每段補 &shadow
 const p1 = core.searchPlan([{ dex: 25, shadow: true }, { dex: 26, shadow: true }]);
 eq(p1.text, '25,26&shadow', 'searchPlan 全暗影 → &shadow 限定詞');
 eq(p1.qualified, 'shadow', 'searchPlan qualified=shadow');
-// 連續壓縮 + 純極巨
-const p2 = core.searchPlan([{ dex: 3, max: true }, { dex: 4, max: true }, { dex: 5, max: true }]);
+// 連續壓縮 + 純 D-Max
+const p2 = core.searchPlan([{ dex: 3, mx: 'dmax' }, { dex: 4, mx: 'dmax' }, { dex: 5, mx: 'dmax' }]);
 eq(p2.text, '3-5&dynamax', 'searchPlan 連續編號壓縮 + &dynamax');
+// R18：純 G-Max → &gigantamax（dynamax 關鍵字查不到超極巨化個體）
+const p6 = core.searchPlan([{ dex: 6, mx: 'gmax' }, { dex: 7, mx: 'gmax' }]);
+eq(p6.text, '6,7&gigantamax', 'searchPlan 純 G-Max → &gigantamax');
+eq(p6.qualified, 'gigantamax', 'searchPlan qualified=gigantamax');
 // 混形態：同編號不同 class → mixedDexes 非空、不補限定詞
-const p3 = core.searchPlan([{ dex: 133, shadow: true }, { dex: 133, max: true }, { dex: 134, shadow: true }]);
+const p3 = core.searchPlan([{ dex: 133, shadow: true }, { dex: 133, mx: 'dmax' }, { dex: 134, shadow: true }]);
 eq(p3.text, '133,134', 'searchPlan 名單含混形態時 → 不補限定詞（避免誤導，警告由 UI modal 處理）');
 ok(p3.mixedDexes.length === 1 && p3.mixedDexes[0] === 133, 'searchPlan 混形態偵測（133 同時有暗影+極巨化）');
 // 混一般+暗影（無法補 &shadow）
 const p4 = core.searchPlan([{ dex: 1, shadow: true }, { dex: 2 }]);
 ok(p4.qualified === null && p4.mixedDexes.length === 0, 'searchPlan 暗+一般 → 無限定詞可用（badge 提醒由 UI 層處理 mixed）');
+// R18 反向①：D-Max＋G-Max 混合 → 不補任何限定詞，且 warning 明示無法可靠表示
+const p7 = core.searchPlan([{ dex: 8, mx: 'dmax' }, { dex: 9, mx: 'gmax' }]);
+eq(p7.text, '8,9', 'searchPlan D+G 混合 → 不補限定詞');
+ok(p7.qualified === null, 'searchPlan D+G 混合 → qualified=null');
+ok(typeof p7.warning === 'string' && p7.warning.length > 0, 'searchPlan D+G 混合 → warning 明示需逐隻複核');
+// R18 反向②：純特殊參戰者（dynamax／gigantamax 兩關鍵字都查不到）→ 無限定詞 + warning
+const p8 = core.searchPlan([{ dex: 888, mx: 'special' }, { dex: 889, mx: 'special' }]);
+eq(p8.text, '888,889', 'searchPlan 特殊參戰者 → 無限定詞');
+ok(p8.qualified === null, 'searchPlan 特殊參戰者 → qualified=null');
+ok(p8.warning && /特殊/.test(p8.warning), 'searchPlan 特殊參戰者 → warning 明示兩關鍵字皆不適用');
+// R18 反向③：特殊參戰者＋一般 D-Max → 無限定詞 + warning
+const p9 = core.searchPlan([{ dex: 890, mx: 'special' }, { dex: 25, mx: 'dmax' }]);
+ok(p9.qualified === null && p9.warning != null, 'searchPlan special+dmax → 無限定詞且給 warning');
+// R03 反向：dbRows 名單外保留個體——&gigantamax 只選 G-Max，名單外 D-Max 保留個體不算被選中
+const pDb = core.searchPlan(
+  [{ dex: 3, id: 'charizard_gmax', mx: 'gmax' }],
+  [{ dex: 3, id: 'charizard_dmax', keep: true, mx: 'dmax' },
+   { dex: 3, id: 'charizard', keep: true }]);
+eq(pDb.text, '3&gigantamax', 'searchPlan &gigantamax 補上限定詞');
+ok(pDb.mixedDexes.length === 0, 'searchPlan &gigantamax：名單外 D-Max／一般保留形態不會被選中');
+// 相容舊欄位 max:true（＝一般 D-Max）
+const p10 = core.searchPlan([{ dex: 3, max: true }]);
+eq(p10.text, '3&dynamax', 'searchPlan 舊欄位 max:true 相容為 dmax');
 // tooLong：900 字上限偵測
 const many = []; for (let d = 1; d <= 400; d++) many.push({ dex: d * 2, shadow: true });
 const p5 = core.searchPlan(many);

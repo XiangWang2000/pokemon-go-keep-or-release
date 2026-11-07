@@ -112,7 +112,7 @@ function cardHtml(f) {
   ].filter(Boolean).join(' · ');
   const isSh = f.id.endsWith('_shadow');
   return `<div class="card" data-id="${CORE.esc(f.id)}" tabindex="0" role="button" aria-label="${CORE.esc(f.zh)}，${CORE.esc(f.verdict.tierName)}">
-    <img loading="lazy" decoding="async" src="${spriteOf(f)}" alt="" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${f.dex}.png'"${isSh ? ' class="shadowicon"' : ''}>${f.dmg ? '<span class="dmbadge gmax" title="可參加超極巨化戰（Gigantamax）">G·巨</span>' : f.dm ? '<span class="dmbadge" title="可參加極巨戰（Max Battle）">極</span>' : f.megas ? '<span class="dmbadge megab" title="這個物種有超級進化形態">超</span>' : ''}${marks[f.id] ? `<span class="markchip m-${({ '保留': 'keep', '可送': 'maybe', '已送': 'sent' })[marks[f.id]]}" title="我的標記：${CORE.esc(marks[f.id])}">${CORE.esc(marks[f.id])}</span>` : ''}
+    <img loading="lazy" decoding="async" src="${spriteOf(f)}" alt="" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${f.dex}.png'"${isSh ? ' class="shadowicon"' : ''}>${f.dmg ? '<span class="dmbadge gmax" title="可參加超極巨化戰（Gigantamax）">G·巨</span>' : (f.dm && f.dmx && f.dmx.mode === 'special') ? '<span class="dmbadge" title="Max 特殊參戰者：可參加 Max Battle，但不能 Dynamax（使用專屬 Max 招式）">特</span>' : f.dm ? '<span class="dmbadge" title="可參加極巨戰（Max Battle）">極</span>' : f.megas ? '<span class="dmbadge megab" title="這個物種有超級進化形態">超</span>' : ''}${marks[f.id] ? `<span class="markchip m-${({ '保留': 'keep', '可送': 'maybe', '已送': 'sent' })[marks[f.id]]}" title="我的標記：${CORE.esc(marks[f.id])}">${CORE.esc(marks[f.id])}</span>` : ''}
     <div class="zh">${CORE.esc(f.zh)}</div>
     <div class="en">${CORE.esc(f.en)}</div>
     <div class="row">${f.t.map(typeBadge).join('')}</div>
@@ -133,7 +133,7 @@ function passFilter(f) {
   if (filtr.extra) {
     if (filtr.extra === 'legend' && !(tags.includes('legendary') || tags.includes('mythical') || tags.includes('ultrabeast'))) return false;
     if (filtr.extra === 'mega' && !(f.megas || tags.includes('mega') || tags.includes('supermega'))) return false;
-    if (filtr.extra === 'dmax' && !f.dm) return false;
+    if (filtr.extra === 'dmax' && !(f.dm && (!f.dmx || f.dmx.mode !== 'special'))) return false; // R16：特殊參戰者不能 Dynamax，不算「可極巨化」
     if (filtr.extra === 'gmax' && !f.dmg) return false;
     if (filtr.extra === 'shadow' && !(tags.includes('shadow') || tags.includes('shadoweligible'))) return false;
     if (filtr.extra === 'regional' && !tags.includes('regional')) return false;
@@ -190,7 +190,8 @@ function openDetail(f) {
   const b = bestRank(f);
   const tags = f.tags || [];
   const tagNames = { legendary: '傳說', wildlegendary: '野外傳說', mythical: '幻獸', ultrabeast: '異獸', regional: '區域限定', mega: '超級進化', supermega: '超級進化(X/Y)', shadow: '已暗影', shadoweligible: '物種有暗影版（火箭隊獲取，一般個體不可轉換）', alolan: '阿羅拉', galarian: '伽勒爾', hisuian: '洗翠', paldean: '帕底亞', starter: '御三家', duplicate: '重複型態' };
-  if (f.dmg) tagNames.dmg = '超極巨化'; else if (f.dm) tagNames.dm = '極巨化';
+  if (f.dmg) tagNames.dmg = '超極巨化';
+  else if (f.dm) tagNames.dm = (f.dmx && f.dmx.mode === 'special') ? 'Max 特殊參戰（不能 Dynamax）' : '極巨化';
   const rankChips = [500, 1500, 2500, 10000].map(L => f.pvp[L] ? `<span class="rankchip" title="${L === 500 ? 'PvPoke 500 CP 格式總榜（非現行小小盃盃規）；現行小小盃榜見「限制盃／特殊盃賽排名」' : 'PvPoke 評分（模擬值，不同聯盟尺度不同）：' + (f.pvp[L].rating ?? '—')}">${rankName(L)} <b>#${f.pvp[L].r}</b></span>` : '').join('');
   const cupChips = (f.cupR || []).map(c => {
     const cd = (DATA.cups || [])[c[0]];
@@ -202,23 +203,29 @@ function openDetail(f) {
   // Max Battle 槽位（GO 介面名稱：攻擊／極巨防壁／極巨回復）：
   // H03 機制修正：一般極巨攻擊的屬性＝快招屬性（不是蓄力招！用快招招不同快招就打不同
   //   屬性的極巨攻擊）；超極巨化個體的攻擊槽是專屬超極巨招式，屬性固定（dmx.tp 來源：GM VN_BM）
-  // R06：蒼響／藏瑪然特雖是一般 Dynamax（dm 而非 dmg），Max 攻擊仍是「專屬鋼屬招式」
-  //   （Behemoth Blade／Bash，D-Max 威力級）——前端依 dmx.mode 分流，不誤掛快招屬性
+  // R16：Max 參戰能力分類 dmx.mode——'dmax'（一般 D-Max，快招屬性）／'gmax'（超極巨專屬招式）／
+  //   'special'（特殊參戰者：蒼響(劍之王)／藏瑪然特(盾之王)／無極汰那——可參戰 Max Battle
+  //   但不能 Dynamax，攻擊槽是 Max Battle 專屬招式：Behemoth Blade／Bash（鋼）或 Dynamax Cannon（龍））
   let maxBlock = '';
   if (f.dmx && (f.dm || f.dmg)) {
-    const fixedRow = f.dmg || f.dmx.mode === 'gmax';
+    const mode = f.dmx.mode; // 'dmax' | 'gmax' | 'special'
+    const fixedRow = mode !== 'dmax';
     const gmaxRow = !!f.dmg;
+    const specName = f.id === 'eternatus' ? 'Dynamax Cannon' : 'Behemoth Blade／Bash';
+    const fixedDesc = gmaxRow ? '專屬超極巨招式（G-Max Move，屬性固定）' : `Max Battle 專屬招式（${specName}，屬性固定）`;
     const atks = fixedRow
-      ? `<span class="charged">極巨攻擊〈${TYPE_ZH[f.dmx.tp] || f.dmx.tp || '—'}〉<small>${gmaxRow ? '專屬超極巨招式（G-Max Move，屬性固定）' : '專屬 Max 招式（Behemoth Blade／Bash，屬性固定）'}</small></span>`
+      ? `<span class="charged">極巨攻擊〈${TYPE_ZH[f.dmx.tp] || f.dmx.tp || '—'}〉<small>${fixedDesc}</small></span>`
       : (f.fmr || []).map(id => {
           const m = (DATA.moves || {})[id];
           return m && m.t ? `<span class="charged">極巨攻擊〈${TYPE_ZH[m.t] || m.t}〉<small>${CORE.esc(m.n)}（用同屬性快招集能即為此攻擊）</small></span>` : '';
         }).join('');
+    const fixedNote = gmaxRow
+      ? '超極巨化個體的極巨攻擊＝專屬超極巨招式，屬性固定不隨快招變化；一般極巨化個體才隨快招屬性變化'
+      : `Max 特殊參戰者（不能 Dynamax）的極巨攻擊＝Max Battle 專屬招式（${specName}），布置快招不影響屬性`;
     maxBlock = `<div class="maxmoves"><b>極巨戰招式（Max Battle 用）</b>
       <div class="moves">${atks}<span class="charged">極巨防壁<small>替全隊減傷</small></span><span class="charged">極巨回復<small>回復自己與同伴 HP</small></span></div>
       <p class="muted" style="font-size:11px">${fixedRow
-        ? (gmaxRow ? '超極巨化個體的極巨攻擊＝專屬超極巨招式，屬性固定不隨快招變化；一般極巨化個體才隨快招屬性變化'
-                   : '蒼響／藏瑪然特的極巨攻擊＝專屬 Max 招式（鋼屬固定），布置快招不影響屬性')
+        ? fixedNote
         : '一般極巨攻擊的屬性＝<b>快招</b>屬性（配錯快招就打不出想要的屬性，快招可用快招學習器改）'}；快招累積 Max 條後，於極巨階段放招。</p></div>`;
   }
 
@@ -284,7 +291,7 @@ function openDetail(f) {
   if (f.dmx && (f.dm || f.dmg)) {
     const atkPct = Math.max(0.1, 100 - f.dmx.pct).toFixed(1).replace(/\.0$/, '');
     dmxHtml = `<details class="fold"><summary>極巨戰（Max Battle）攻擊估算<span class="fdnote">攻手前 ${atkPct}%</span></summary><div class="foldbody"><table class="stats">
-      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : (f.dmx.mode === 'gmax' ? '（專屬 Max 招式，固定不變）' : '（＝快招屬性，換快招即換屬性）')}</td></tr>
+      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : (f.dmx.mode === 'special' ? `（Max Battle 專屬招式 ${f.id === 'eternatus' ? 'Dynamax Cannon' : 'Behemoth Blade／Bash'}，固定不變）` : (f.dmx.mode === 'gmax' ? '（專屬 Max 招式，固定不變）' : '（＝快招屬性，換快招即換屬性）'))}</td></tr>
       <tr><td>極巨攻擊循環 DPS 估算</td><td>${f.dmx.dps}</td></tr>
       <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（可極巨化型態內）</td></tr></table>
       <div class="ivref" style="margin-top:6px">Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主。估算假設（揭露式的相對指標，不是實測模擬）：<br>
@@ -370,7 +377,7 @@ function openDetail(f) {
       <tr><td>種族值（天生固定，非個體值）攻/防/血</td><td>${f.a} / ${f.d} / ${f.h}</td></tr>
       <tr><td>最高 CP（Lv50 滿個體）</td><td>${f.cp50}</td></tr>
       ${(f.bulkPct >= 85) ? `<tr><td>守館體質</td><td>有效體質（HP×DEF）排行前 <b>${(100 - f.bulkPct).toFixed(1).replace(/\.0$/, '')}%</b>——能占守道館較久；但守館收益本來就低（金幣有上限／被淘汰就結束），只當參考指標</td></tr>` : ''}
-      <tr><td>標籤</td><td>${CORE.esc(tags.map(t => tagNames[t] || t).concat(f.dmg ? ['超極巨化'] : f.dm ? ['極巨化'] : []).join('、')) || '一般'}</td></tr>
+      <tr><td>標籤</td><td>${CORE.esc(tags.map(t => tagNames[t] || t).concat(f.dmg ? ['超極巨化'] : f.dm ? [(f.dmx && f.dmx.mode === 'special') ? 'Max 特殊參戰（不能 Dynamax）' : '極巨化'] : []).join('、')) || '一般'}</td></tr>
       ${f.li ? '<tr><td></td><td>⚠ 超級聯盟禁入（PvPoke 列此形態在超級聯盟對戰不可使用，因此榜單不會有它的超級聯盟名次；其他聯盟不受影響）</td></tr>' : ''}
     </table>`)}
 
@@ -546,11 +553,14 @@ function toast(msg) {
 $('#copyList').addEventListener('click', () => {
   // R03：搜尋字串的形態風險檢查要對照「整個資料庫」，不能只看目前篩出的名單——
   // 同編號名單外的保留個體（暗影／極巨化／一般形態）也會被編號搜尋一起選中
+  // R18：Max 參戰能力分類 mx（'dmax'|'gmax'|'special'）——dynamax 只查 D-Max、
+  // gigantamax 只查 G-Max、特殊參戰者兩個關鍵字都不適用 → 由 searchPlan 決定限定詞與警告
+  const mxOf = f => f.dmg ? 'gmax' : f.dm ? ((f.dmx && f.dmx.mode === 'special') ? 'special' : 'dmax') : null;
   const dbRows = FORMS.map(f => ({
     dex: f.dex, id: f.id, keep: f.verdict.tier < 3,
-    shadow: /_shadow$/.test(f.id), max: !!(f.dm || f.dmg),
+    shadow: /_shadow$/.test(f.id), mx: mxOf(f),
   }));
-  const plan = CORE.searchPlan(lastList.map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), max: !!(f.dm || f.dmg) })), dbRows);
+  const plan = CORE.searchPlan(lastList.map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), mx: mxOf(f) })), dbRows);
   const s = plan.text;
   const copyText = navigator.clipboard && navigator.clipboard.writeText
     ? navigator.clipboard.writeText(s)
@@ -565,7 +575,9 @@ $('#copyList').addEventListener('click', () => {
     const n = [...new Set(lastList.map(f => f.dex))].length;
     let msg = `已複製 ${n} 個編號——貼進遊戲收藏的搜尋列即可一次篩出`;
     if (plan.qualified === 'shadow') msg += '（已補 &shadow：只選中暗影個體）';
-    else if (plan.qualified === 'dynamax') msg += '（已補 &dynamax：只選中可極巨化個體）';
+    else if (plan.qualified === 'dynamax') msg += '（已補 &dynamax：只選中一般可極巨化個體；超極巨化要用 &gigantamax）';
+    else if (plan.qualified === 'gigantamax') msg += '（已補 &gigantamax：只選中超極巨化個體）';
+    if (plan.warning) msg += '\n⚠ ' + plan.warning;
     toast(msg);
     // H07：名單內同一個編號混有不同形態 → 遊戲搜尋無法用編號區分暗影／極巨化／一般，
     // 直接全選傳送會把要留的那隻一起送掉 → 必須強擋警告
@@ -580,7 +592,16 @@ function showMixWarn(plan) {
   if (!modal) return;
   const body = document.getElementById('mixWarnBody');
   const mixed = plan.mixedDexes || [];
-  if (!mixed.length) { modal.classList.add('hidden'); return; }
+  if (!mixed.length && !plan.warning) { modal.classList.add('hidden'); return; } // R18：純警告也可顯示
+  const warningHtml = plan.warning ? `<p style="margin-top:8px">⚠ ${CORE.esc(plan.warning)}</p>` : '';
+  if (!mixed.length) {
+    body.innerHTML = `<p>這份名單<b>無法用單一搜尋字串可靠表示</b>——遊戲的 <code>dynamax</code> 只查 D-Max、<code>gigantamax</code> 只查 G-Max，特殊 Max 參戰者兩者都不適用。</p>${warningHtml}<p style="margin-top:8px"><b>請逐隻挑選後再操作。</b></p>`;
+    modal.classList.remove('hidden');
+    lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
+    const closeBtn = document.getElementById('mixWarnClose');
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
+    return;
+  }
   // 名單內的 zh 名稱（問題編號列出的是名單內形態）
   const byDex = {};
   lastList.forEach(f => { (byDex[f.dex] ||= []).push(f); });
@@ -600,7 +621,7 @@ function showMixWarn(plan) {
   }).join('');
   body.innerHTML = `<p><b>這份名單裡有 ${mixed.length} 個圖鑑編號混合了不同形態</b>——遊戲的搜尋會一次選中該編號的<b>全部符合限定詞的形態</b>（暗影／極巨化／一般個體無法用編號區分），直接全選傳送<b>會把要留的也送掉</b>。</p>
     <table class="stats" style="width:100%">${rows}</table>
-    <p style="margin-top:8px">正確做法：在遊戲收藏搜尋列<b>先加限定詞</b>（暗影加 <code>&amp;shadow</code>、可極巨化個體加 <code>&amp;dynamax</code>，現行 GO 支援這兩個關鍵字），或逐隻挑選後再傳送。<b>不要只用編號全選。</b></p>`;
+    <p style="margin-top:8px">正確做法：在遊戲收藏搜尋列<b>先加限定詞</b>（暗影加 <code>&amp;shadow</code>、一般可極巨化個體加 <code>&amp;dynamax</code>、超極巨化個體加 <code>&amp;gigantamax</code>——<code>dynamax</code> 只查 D-Max、<code>gigantamax</code> 只查 G-Max），或逐隻挑選後再傳送。<b>不要只用編號全選。</b></p>${warningHtml}`;
   modal.classList.remove('hidden');
   // R11：先存還原目標、再移動焦點（先 focus 會把 activeElement 變成 closeBtn、還原目標就丟了）
   lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
@@ -661,7 +682,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=2046f86856').then(r => {
+fetch('data/data.json?v=22b9822333').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {

@@ -115,9 +115,11 @@
   // - 極巨招式威力隨等級：一般 L1/2/MAX!=250/300/350（Max+ 450）；G-Max 350/400/450（Max+ 550）
   // - 極巨條由快招／蓄力招命中累積（快招較有效率）；估算法：以「每次快招命中集能速度相同」為
   //   假設 → 每次滿條所需快招次數為共用常數 HITS_PER_METER，只有快招快慢影響集條時間。
-  //   HITS_PER_METER 是相對尺度常數，只有快招快慢影響集條時間；不影響「攻手池前 10%（pct≥90）」
-  //   的成員與排名（R08 敏感度分析，2026-11-06：N=15/20/25/30/35 五組重算，pct≥90 成員 17 筆完全相同）。
-  //   N 只改動 dps 絕對值尺度，不改變池內相對排名（所有物種同值）。
+  //   HITS_PER_METER 是相對尺度常數（公式 A/(N·t＋2.5)，所有物種同一 N）：
+  //   快招時間相同的物種間順序不受 N 影響；但快招時間不同的兩物種，其相對順序與百分位
+  //   會隨 N 翻轉——已實證的只有「攻手池前 10%（pct≥90）成員集合」在 N=15/20/25/30/35 穩定
+  //   （R08 敏感度分析，2026-11-06：五組重算，成員 17 筆完全一致）；其餘順位／百分位
+  //   依 N 而異，未另行宣稱（R20：不把「成員集合不變」過度推論為「排名不變」）。
   var MAX_ATK_DUR_SEC = 2.5;   // 極巨攻擊施放時間（GM：VN_BM 模板 durationMs=2500）
   var HITS_PER_METER = 25;    // 假設常數：滿一條極巨條 ≈ 25 次快招命中
   function maxRate(input) {
@@ -127,32 +129,44 @@
   }
 
   /* ---------- 複製遊戲搜尋字串 ---------- */
-  // rows：篩選出的型態 [{dex, id, shadow(bool), max(bool)}]（id／shadow／max 純資料，無 DOM）
-  // dbRows：**整個資料庫**的型態 [{dex, id, keep(bool), shadow, max}]（R03）。
+  // rows：篩選出的型態 [{dex, id, shadow(bool), mx}]（id／shadow／mx 純資料，無 DOM）。
+  //   mx＝Max 參戰能力分類（R18）：'dmax'（一般 D-Max）| 'gmax'（超極巨化）| 'special'
+  //   （特殊 Max 參戰者：可參戰但不能 Dynamax，如蒼響(劍之王)／藏瑪然特(盾之王)／無極汰那）| null。
+  //   相容舊欄位 max:true（＝'dmax'）。
+  // dbRows：**整個資料庫**的型態 [{dex, id, keep(bool), shadow, mx}]（R03）。
   //   keep＝「非明確可傳送」（tier 0/1/2）；GO 用編號搜尋會一次選中該編號『全部符合限定詞的形態』，
   //   名單（篩選結果）可能不含同編號的保留個體——只比對篩選名單會漏掉它們。
-  // 回傳 { text, qualified('shadow'|'dynamax'|null), mixedDexes:[], tooLong }
-  // - 形態限定詞：全部暗影行 → 每段補 &shadow（只選中暗影個體）；全部可極巨行 → &dynamax
+  // 回傳 { text, qualified('shadow'|'dynamax'|'gigantamax'|null), mixedDexes:[], tooLong, warning }
+  // R18（官方搜尋 FAQ＋GO Hub）：`dynamax` 只查 D-Max、`gigantamax` 只查 G-Max；
+  // 特殊參戰者兩個關鍵字都不適用 → 名單一旦含 special 或 D/G 混合，就無法用單一搜尋字串
+  // 可靠表示——不補限定詞（不造假承諾），並在 warning 說明需逐隻複核。
+  // - 形態限定詞：全部暗影行 → &shadow（只選中暗影個體）；全部 'dmax' → &dynamax；
+  //   全部 'gmax' → &gigantamax；其餘組合 → 不補
   // - mixedDexes 兩類來源：
-  //   (a) 名單內同編號混有不同形態類（暗影／極巨化／一般，無法用編號區分）
+  //   (a) 名單內同編號混有不同形態類（暗影／Max／一般，無法用編號區分）
   //   (b) R03：名單外、但會被這個搜尋選中的同編號「保留個體」（限定詞會被一起套上，
-  //       所以暗影名單只看暗影保留個體、dynamax 名單只看可極巨保留個體、無限定詞全都算）
+  //       所以暗影名單只看暗影保留個體、dynamax 名單只看 'dmax' 保留個體、
+  //       gigantamax 名單只看 'gmax' 保留個體、無限定詞全都算）
   //       ——呼叫端必須對這些號碼提醒「不可用編號全選傳送」
   function searchPlan(rows, dbRows) {
     var dexes = [];
     var seen = {};
-    var allShadow = true, allMax = true;
-    var groups = {}; // dex -> {class: true}  class = 'shadow'|'max'|'normal'
+    var allShadow = true, allDmax = true, allGmax = true;
+    var maxKinds = {};                    // 名單內出現過的 max 類別（dmax/gmax/special）
+    var groups = {}; // dex -> {class: true}  class = 'shadow'|'dmax'|'gmax'|'special'|'normal'
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (!seen[r.dex]) { seen[r.dex] = true; dexes.push(r.dex); }
-      var cls = r.shadow ? 'shadow' : (r.max ? 'max' : 'normal');
+      var mx = r.mx || (r.max ? 'dmax' : null);
+      var cls = r.shadow ? 'shadow' : (mx || 'normal');
       if (cls !== 'shadow') allShadow = false;
-      if (cls !== 'max') allMax = false;
+      if (cls !== 'dmax') allDmax = false;
+      if (cls !== 'gmax') allGmax = false;
+      if (mx) maxKinds[mx] = true;
       (groups[r.dex] = groups[r.dex] || {})[cls] = true;
     }
     dexes.sort(function (a, b) { return a - b; });
-    var qual = allShadow ? 'shadow' : (allMax ? 'dynamax' : null);
+    var qual = allShadow ? 'shadow' : (allDmax ? 'dynamax' : (allGmax ? 'gigantamax' : null));
     var parts = [];
     for (var j = 0; j < dexes.length;) {
       var k = j;
@@ -161,10 +175,18 @@
         : (dexes[j] + 1 === dexes[k] ? dexes[j] + ',' + dexes[k] : dexes[j] + '-' + dexes[k]);
       if (qual === 'shadow') seg += '&shadow';
       else if (qual === 'dynamax') seg += '&dynamax';
+      else if (qual === 'gigantamax') seg += '&gigantamax';
       parts.push(seg);
       j = k + 1;
     }
     var text = parts.join(',');
+    // R18：無法用單一限定詞可靠表示的 Max 混合 → 明示，要求逐隻複核
+    var warning = null;
+    if (maxKinds.dmax && maxKinds.gmax) {
+      warning = '名單混合了 D-Max 與 G-Max：遊戲的 dynamax 關鍵字只查 D-Max、gigantamax 只查 G-Max，沒有任何一個字串能「只選中這份名單」——請逐隻在收藏中複核';
+    } else if (maxKinds.special) {
+      warning = '名單含 Max 特殊參戰者（蒼響(劍之王)／藏瑪然特(盾之王)／無極汰那）：可以打 Max Battle 但不能 Dynamax，dynamax 與 gigantamax 兩個關鍵字都搜不到牠們——請逐隻在收藏中複核';
+    }
     // (a) 名單內同號不同形態類
     var mixedDexes = [];
     var seen2 = {};
@@ -177,12 +199,14 @@
       var selIds = {};
       for (var s = 0; s < rows.length; s++) selIds[rows[s].id] = true;
       var planDex = seen; // dex -> true（名單內編號）
+      var dbMx = function (x) { return x.mx || (x.max ? 'dmax' : null); }; // 相容舊欄位
       var risky = {};
       for (var b = 0; b < dbRows.length; b++) {
         var d = dbRows[b];
         if (!planDex[d.dex] || selIds[d.id] || !d.keep) continue;
-        if (qual === 'shadow' && !d.shadow) continue;  // &shadow 只選中暗影
-        if (qual === 'dynamax' && !d.max) continue;    // &dynamax 只選中可極巨化
+        if (qual === 'shadow' && !d.shadow) continue;      // &shadow 只選中暗影
+        if (qual === 'dynamax' && dbMx(d) !== 'dmax') continue;  // &dynamax 只選中 D-Max
+        if (qual === 'gigantamax' && dbMx(d) !== 'gmax') continue; // &gigantamax 只選中 G-Max
         risky[d.dex] = true;
       }
       for (var rk in risky) if (!seen2[rk]) mixedDexes.push(+rk);
@@ -193,6 +217,7 @@
       qualified: qual,
       mixedDexes: mixedDexes,
       tooLong: text.length > 900,
+      warning: warning,
     };
   }
 
