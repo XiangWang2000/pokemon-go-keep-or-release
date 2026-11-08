@@ -260,6 +260,8 @@ const SUFFIX_ZH = {
   zen: '達摩模式', standard: '一般模式', sunny: '晴天形態', rainy: '陰雨形態', snowy: '雪雲形態',
   heat: '加熱形態', wash: '清洗形態', mow: '除草形態', fan: '旋風形態', frost: '結凍形態',
   white: '白之形態', black: '黑之形態', hero: '英雄的樣子',
+  // 裝甲超夢（2020 造型，GO 唯一 armored 型態）：token 已入表（原本缺漏 → zh 停在「超夢」、icon fallback 裸圖）
+  armored: '裝甲形態',
   crowned_sword: '劍之王', crowned_shield: '盾之王',
   single_strike: '一擊流', rapid_strike: '連擊流',
   amped: '高音形態', low_key: '低音形態',
@@ -280,6 +282,9 @@ const ICON_TOKEN_FORM = {
   attack: 'Attack', defense: 'Defense', speed: 'Speed', sunny: 'Sunny', rainy: 'Rainy', snowy: 'Snowy',
   heat: 'Heat', wash: 'Wash', mow: 'Mow', fan: 'Fan', frost: 'Frost',
   white: 'White', black: 'Black', hero: 'Hero',
+  // 裝甲超夢（2020 造型，GO 唯一 armored 型態）：reactmap 把這個 form 命名為「A」+ isCostume，
+  // uicons 檔名是 {dex}_f133.png——不映射就會 fallback 到裸 {dex}.png（一般超夢圖，易誤導）
+  armored: 'A',
   crowned_sword: 'Crowned Sword', crowned_shield: 'Crowned Shield', '10': '10%',
   single_strike: 'Single Strike', rapid_strike: 'Rapid Strike',
   amped: 'Amped', low_key: 'Low Key',

@@ -300,6 +300,16 @@ console.log('\n[R25] IV 名次錨點：PvPoke 預設 IV ≠ Rank 1（外部對�
   t('判定理由不再以 rank1 參考稱呼 defaultIVs', oldLabel.length === 0, '違規: ' + oldLabel.slice(0, 6).join(' '));
 }
 
+/* ---------- 發版後修正：armored 型態 token（裝甲超夢曾 fallback 到一般超夢圖） ---------- */
+console.log('\n[ICON] armored token：zh／icon 都要區分出「裝甲形態」');
+{
+  const arm = form('mewtwo_armored');
+  t('mewtwo_armored zh 含「裝甲形態」（ formerly 顯示「超夢」無法區分）', (arm.zh || '').includes('裝甲形態'), arm.zh);
+  t('mewtwo_armored icon 在 uicons 為獨立 _f133 檔', arm.icon === '150_f133.png', arm.icon);
+  t('mewtwo_armored icon ≠ 一般超夢 icon（不同圖才不誤導）', arm.icon !== form('mewtwo').icon);
+  t('mewtwo_shadow 維持 _a1（暗影共用 base art 設計未變）', form('mewtwo_shadow').icon === '150_a1.png');
+}
+
 /* ---------- R04 反向稽核：假暗影 tier3 注入 → audit 必須 exit≠0 ---------- */
 console.log('\n[R04] 反向稽核：注入假「高價值暗影可傳送」→ audit 攔截');
 {
