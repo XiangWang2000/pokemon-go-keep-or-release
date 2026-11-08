@@ -524,7 +524,9 @@ for (const p of gm.pokemon) {
     pvp[L] = e ? { r: e.r, rating: e.rating, mv: e.moveset || undefined } : null; // mv＝PvPoke 推薦招式組合 [快, 蓄1, 蓄2]
   }
 
-  // 建議保留 IV（PvPoke 提供的各聯賽 rank1 參考；等級可為半級，勿 round——半級是有效等級）
+  // 建議保留 IV：PvPoke defaultIVs——**模擬時的預設 IV，不是枚舉出的體質 Rank 1**（R25 反例：
+  // Azumarill 超級聯盟真正第 1＝0/15/15 Lv45.5、PvPoke 預設 4/15/13＝#215）；欄位只當「模擬起點」曝光；
+  // 等級可為半級，勿 round——半級是有效等級
   const ivRef = {};
   const di = p.defaultIVs || {};
   for (const L of LEAGUES.slice(0, 3)) {
@@ -873,7 +875,7 @@ function judge(e) {
   } else if (b && b.r <= 50) {
     tier = 0;
     reasons.push(LEAGUE_ZH[b.L] + '排行第 ' + b.r + ' 名：對戰頂尖，值得投資等級與糖果');
-    reasons.push('IV 會影響名次（rank1 參考 IV 見下方）；此物種門檻寬，一般 IV 已堪用');
+    reasons.push('IV 會影響名次（下方有 PvPoke 預設 IV 參考，非必然 Rank 1）；此物種門檻寬，一般 IV 已堪用');
   } else if (tags.includes('shadow') && b && b.r <= 200 && !pveStar(e)) {
     // 暗影要讓路給「PvE 前 3%」：暗影 20% 攻擊加成常把鐵腕類型態推上頂尖攻打手，
     // 此時「頂尖攻打手（必留）」比名次說明更有參考價值（gigalith_shadow 案例）

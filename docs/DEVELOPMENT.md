@@ -51,8 +51,8 @@ node tools/build_data.js
 node tools/bump.js
 ```
 
-`npm run build`＝重建；`npm test`＝核心單元測試（`tools/test_core.js`，24 項手算錨點）＋整合測試（`tools/test_integration.js`，39 項——
-真資料交叉驗證＋反向稽核，R14，40 項）＋資料稽核（`tools/audit_data.js`）；
+`npm run build`＝重建；`npm test`＝核心單元測試（`tools/test_core.js`，53 項手算錨點）＋整合測試（`tools/test_integration.js`，
+真資料交叉驗證＋反向稽核，R14，93 項）＋資料稽核（`tools/audit_data.js`）；
 `node tools/diff_tiers.js [基準] [現行] [輸出檔名]`＝升降級報告（部署前必看，重點核對「轉為可傳送」清單）。
 基準可用 `git:<revision>`（R13：預設 `git:97ed136`＝修正前最後一次提交，任何 checkout 都能重現；不再依賴 gitignored 的快照檔）。
 `tools/parse_max.js`（R10）拆出純函式 `parseMaxEntries`／`buildIndex` 供整合測試直接呼叫；
@@ -166,7 +166,7 @@ GO 的 Max Battle 個體是獨立個體（只有 Power Spot 抓到／孵出的�
 
 ### 極巨戰（Max Battle）攻擊估算
 
-Max Battle 只有極巨化個體能出戰、輸出由「極巨攻擊」主導，一般 PvE 估算衡量的是快招×蓄力招循環，
+Max Battle 輸出由「極巨攻擊」主導，一般 PvE 估算衡量的是快招×蓄力招循環，
 兩者不可互相套用——所以有獨立的 `dmx` 欄位（僅 dm／dmg 行）。機制（2026-11-05 核實：Niantic 官方 Max Battle
 說明 + Bulbapedia「Max Move (GO)」威力表 + PokeMiners GM `VN_BM_*` 模板）：
 
@@ -250,14 +250,15 @@ base 行是 PvPoke 模擬殘留，不建行。
    （PvP 可得前 150／PvE 全榜前 10%／屬性分榜前 10% 暗影 → tier3 即 fail）
 6. 關鍵物種抽查
 7. 盃賽資料（覆蓋數下限＋撈取日 >420 天警告）
-8. IV 計算與圖鑑一致性（rank1 參考值格式）
+8. IV 計算與圖鑑一致性（PvPoke 預設 IV 參考值格式；R25：該欄是模擬預設輸入，**非必然 Rank 1**——
+   命名不得再現「rank1 參考」）
 9. 進化圖譜健康：重複 id、evoNext 掛空／重複邊、nfe 一致、極巨化拆行母行標記／顯示、
    `_gmax`／`_dmax` 行 `pve.tp` 完整（拆行共用 `pve` 參照的老 bug 回歸防護）、`meta.incomplete` 與各來源撈取日陳列
 
 ## 前端細節
 
 - 卡片啟用 `content-visibility: auto`（畫面外卡片跳過排版與繪製）、圖片掛 `loading="lazy" decoding="async"`、搜尋輸入 150ms 防抖；1718 張卡全量 rerender 約 25ms，圖檔只抓可視範圍。
-- 卡片雙角位：**左上**＝形態徽章 `dmbadge`（極／G·巨／超，帶 hover title）、**右上**＝我的標記 `markchip`（保留／可送／已送）；標記即時反映（`render()` 重繪 grid）＋計數行統計。首頁有收合的「📖 新手指南」（四步動線、徽章說明、兩欄 `gloss` 名詞小抄、資料更新日）。
+- 卡片雙角位：**左上**＝形態徽章 `dmbadge`（極／G·巨／超，帶 hover title）、**右上**＝我的標記 `markchip`（保留／可送／已送）；標記即時反映（`render()` 重繪 grid）＋計數行統計。首頁有收合的「📖 新手指南」（四步動線、徽章說明、兩欄 `gloss` 名詞小抄、資料建置日與各來源撈取日——R28：建置日 ≠ 來源更新日）。
 - 判定／榜單呈現的語意一致：前端 `bestRank()` 與 build 端 `bestStd()` 同調——卡面頭條優先主力聯盟；500 那格一律顯示「500 格式總榜」（`rankName()`）；PvPoke `rating`（數百級模擬值、聯盟尺度不同）只進 rankchip tooltip 不上卡面；`#501` 以後的尾段名次不上卡面（詳細頁仍有全榜）。
 - 篩選／排序／搜尋以 `pogo_filtr` 持久化，屬性下拉在填充選項後補還原值；還原程式碼放在 `const $` 宣告之後（TDZ：放前面會整隻 ScriptError）。
 - 圖鑑排序的同 dex tiebreak 用載入後算好的 `_sk`（`assignSortKeys`）：**地區主導**——關都本體線 → 起源等特殊形態（同本體區、依資料順序）→ 阿羅拉 → 伽勒爾 → 洗翠 → 帕底亞；每條線內部依「一般 → 暗影 → 極巨化 → 超極巨化」排（`_shadow`／`_dmax`／`_gmax` 後綴剝出 core 判線）。目的：騎拉帝納的改造形態線整條排完才接起源形態（不交錯）、椰蛋樹關都線排完才接阿羅拉線。世代篩選以全國圖鑑號區段判定（`GEN_RANGES`）。
@@ -270,6 +271,23 @@ base 行是 PvPoke 模擬殘留，不建行。
   CP 計算不含暗影倍率（與 GO、PvPoke 的 calculateCP 一致；×1.2／×0.8333 只影響戰鬥體質乘積）。
 - 守道館指標：詳細頁「種族值＆上限」區提供有效體質百分位（前 5% 才顯示）。
   守館收益機制上吃虧，只當參考指標，不是評級主因。
+
+## 發版核對（R28）
+
+靜態網站的 `meta.date` 是**建置日**，不是各來源的更新日——發版前要分別核對並在必要時重抓
+（撈取日都在 `meta.fetched`／`cupFetched`，前端兩行說明已直接列出）：
+
+| 來源 | 欄位 | 新鮮度門檻 |
+|---|---|---|
+| Pokémon GO GameMaster（PokeMiners） | `meta.fetched.go_gm` | 無硬門檻；實機機制更新（新招式／Max 改動）就要重抓 |
+| 盃賽榜（PvPoke cups） | `cupFetched` | **45 天**（build 端 `CUP_FRESH_DAYS`，過期記入 `meta.incomplete`；前端標 ⚠ 僅供參考） |
+| D-Max／G-Max 清單（pokemondb） | `meta.fetched.max_list` | 極巨化物種名單有異動時重抓 |
+| PvPoke 基本榜 | （未單獨記錄） | 隨 build 一起重撈 `pvpoke_rankings`；更新日未由腳本記錄（限制揭露） |
+
+- 過期不一定阻擋發版：audit 有 420 天硬警告／45 天評級降帳，但**人要核對**——過期盃不能再用
+  「受限盃人選」理由升級（R09/R26 同語意）。
+- 真機驗證範圍如實標示：PokéGO 搜尋字串語法（R21）、G/D-Max／特殊參戰者（R18）、手機寬度／Modal、
+  未登入／離線行為，皆屬**未實機驗證**登記項，不得在發布說明聲稱「全通過」。
 
 ## 待辦（押後，不阻擋可用性）
 
@@ -294,7 +312,7 @@ base 行是 PvPoke 模擬殘留，不建行。
 - 極巨戰估算是**可解釋的相對指標**（非精算模擬）：滿條 ≈ 25 次快招命中（`HITS_PER_METER`）、
   極巨攻擊威力取 L3 尺度（一般 350／超極巨 450，各階差距一致 +100）、Max+ 未建模（詳細頁揭露）。
 - 少數 GO 專屬變體招式（如覺醒力量屬性變體）譯名為組合生成。
-- 建議對戰 IV 參考值來自 PvPoke 的 defaultIVs，是各聯賽 rank1 的參考值（PvPoke 選檔預設、非本站計算）。
+- 建議對戰 IV 參考值採 PvPoke 的 defaultIVs（PvPoke 排行模擬的預設輸入，非本站計算）——**R25：模擬用預設，非必然 Rank 1**；例：Azumarill 0/15/15 才是真 Rank 1（Lv45.5／CP1499），defaultIVs 4/15/13 實為 #215。
 - 盃賽 meta 隨季度輪替；資料撈取日在榜單與 audit 輸出可見，玩特定盃賽時建議重抓（>420 天 audit 警告）。
 - `meta.date` 為建置日（UTC 計算），本機午夜前後可能與本機日期差 1；各來源自己的撈取日在 `meta.fetched`。
 - 標記只到型態粒度（一個形態一個標記）、存 localStorage；備份／匯入已做，逐隻名冊管理待後續。

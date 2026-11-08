@@ -2,6 +2,7 @@
  * test_core.js — 核心計算單元測試（site/js/core.js 唯一定義，Node 直接可測）
  * 每個案例先手算期望值再比對；此檔同時是 H01/H02/M01/M02/H05/H07 修正的驗證證據。
  * 用法：node tools/test_core.js（全過 → 靜默結束 0；失敗列出斷言後結束 1）
+ * 第四輪新增：R21（搜尋字串尾端單次限定詞）／R22（splitSearchText 分批）／R26（同-CP 盃賽挑選）
  */
 const core = require('../site/js/core.js');
 
@@ -102,6 +103,57 @@ eq(p10.text, '3&dynamax', 'searchPlan 舊欄位 max:true 相容為 dmax');
 const many = []; for (let d = 1; d <= 400; d++) many.push({ dex: d * 2, shadow: true });
 const p5 = core.searchPlan(many);
 ok(p5.tooLong === true, 'searchPlan 超長偵測');
+
+/* ---------- 4b. R21：限定詞只在 OR 群組尾端一次（修正前必失敗） ---------- */
+// 遊戲搜尋運算：逗號（OR）比 &（AND）優先、不支援括號——「1&shadow,25&shadow」
+// 不能當 (1 AND shadow) OR (25 AND shadow) 解讀，會漏掉型態（R21，官方 FAQ＋GO Hub）。
+const r21a = core.searchPlan([{ dex: 1, shadow: true }, { dex: 25, shadow: true }]);
+eq(r21a.text, '1,25&shadow', 'R21 非連續暗影 → 單一尾端 &shadow（舊碼＝1&shadow,25&shadow）');
+const r21b = core.searchPlan([
+  { dex: 1, mx: 'dmax' }, { dex: 2, mx: 'dmax' }, { dex: 4, mx: 'dmax' },
+  { dex: 6, mx: 'dmax' }, { dex: 7, mx: 'dmax' }]);
+eq(r21b.text, '1,2,4,6,7&dynamax', 'R21 多個不連續區間全 D-Max → 尾端一次 &dynamax');
+const r21c = core.searchPlan([{ dex: 6, mx: 'gmax' }, { dex: 9, mx: 'gmax' }, { dex: 11, mx: 'gmax' }]);
+eq(r21c.text, '6,9,11&gigantamax', 'R21 G-Max 非相鄰多物種 → 尾端一次 &gigantamax');
+eq(core.searchPlan([{ dex: 3, mx: 'dmax' }]).text, '3&dynamax', 'R21 單物種不變（3&dynamax）');
+ok(core.searchPlan([]).text === '', 'R21 空名單 → 空字串（不產生孤兒限定詞）');
+// 通用反向：任何帶限定詞的字串不得在中段出現 '&'（限定詞只能是最後一段的尾端）
+const r21x = core.searchPlan([
+  { dex: 1, shadow: true }, { dex: 2, shadow: true }, { dex: 9, shadow: true },
+  { dex: 100, shadow: true }, { dex: 101, shadow: true }]);
+ok((r21x.text.match(/&/g) || []).length === 1 && r21x.text.endsWith('&shadow'),
+  'R21 通用反向：限定詞只能出現在字串尾端一次 ' + r21x.text);
+
+/* ---------- 4c. R22：超長字串分批切分 ---------- */
+// 逗號是 top-level 分隔（語意 OR），切分只能落在逗號邊界、不可破壞 a-b 區間
+eq(JSON.stringify(core.splitSearchText('1,2,999,4', 6)), JSON.stringify(['1,2', '999,4']),
+  'splitSearchText 按逗號邊界切分且每批 ≤ max');
+eq(core.splitSearchText('1-3,4,5', 900).join(','), '1-3,4,5', 'splitSearchText 短字串原樣返回（區間不破壞）');
+{
+  const long = core.searchPlan(many); // 與 p5 同一字串（>900 字）
+  const batches = core.splitSearchText(long.text, 900);
+  ok(batches.length >= 2 && batches.every(b => b.length <= 900), 'splitSearchText 真超長案例每批 ≤900');
+  eq(batches.join(','), long.text, 'splitSearchText 重組等於原字串');
+}
+/* ---------- 4d. R26：IV 計算機盃賽提示（同 CP 過濾） ---------- */
+// 真實語意（R26）：seel 小小盃 #26 / 超級聯盟 #959——選 CP1500 時不得拿小小盃當保留依據
+const cups26 = [
+  { zh: '小小盃', cp: 500, total: 332 },
+  { zh: '超級聯盟限定盃', cp: 1500, total: 1501 },
+];
+const seelCupR = [[0, 26], [1, 959]];
+{
+  const c1500 = core.cupForCap(seelCupR, cups26, 1500);
+  ok(c1500 && c1500.cp === 1500 && c1500.rank === 959, 'R26 CP1500 → 同 CP 榜 #959（舊碼＝小小盃 #26）', )
+    && console.log('     ', JSON.stringify(c1500));
+  const c500 = core.cupForCap(seelCupR, cups26, 500);
+  ok(c500 && c500.cp === 500 && c500.rank === 26, 'R26 CP500 → 小小盃 #26（顯示仍正確）');
+  ok(core.cupForCap(seelCupR, cups26, 2500) === null, 'R26 無同 CP 盃 → null（不給跨 CP 提示）');
+  ok(core.cupForCap(null, cups26, 1500) === null && core.cupForCap([], cups26, 1500) === null, 'R26 空 cupR → null');
+}
+ok(core.dataOlderThanDays('2020-01-01', 45) === true, 'dataOlderThanDays 遠期日 → 過期');
+ok(core.dataOlderThanDays('2026-11-01', 45) === false, 'dataOlderThanDays 新鮮日 → 未過期');
+ok(core.dataOlderThanDays(undefined, 45) === false, 'dataOlderThanDays 無日期 → 不判過期（保守）');
 
 /* ---------- 5. esc（L07） ---------- */
 eq(core.esc('<img src=x onerror=alert(1)>&"\''), '&lt;img src=x onerror=alert(1)&gt;&amp;&quot;&#39;', 'esc 全跳脫 <>&"\'');

@@ -15,7 +15,7 @@
  *          特殊參戰者兩者皆不適用（無限定詞＋warning）
  *   - R10：parse_max 合併語意——先 D-Max 後 G-Max 也能補上 dmg（順序反轉不變）
  * 用法：node tools/test_integration.js（需先 node tools/build_data.js）
- * 目前 62 項。
+ * 目前 93 項。
  */
 const fs = require('fs');
 const os = require('os');
@@ -190,6 +190,114 @@ console.log('\n[R18] dmax／gmax／special 分類與限定詞');
   const planSp = CORE.searchPlan([{ dex: sp.dex, id: sp.id, shadow: false, mx: mxOf(sp) }], dbRows);
   t('特殊參戰者名單 → 無限定詞', planSp.qualified === null && !/dynamax|gigantamax/.test(planSp.text), planSp.text);
   t('特殊參戰者名單 → warning（dynamax／gigantamax 都查不到）', typeof planSp.warning === 'string' && /特殊/.test(planSp.warning), planSp.warning);
+}
+
+/* ---------- R21：真資料 dbRows 下限定詞尾端單次（資料級反向） ---------- */
+console.log('\n[R21] 限定詞只在 OR 群組尾端一次（真資料 dbRows）');
+{
+  const mxOf = f => f.dmg ? 'gmax' : f.dm ? ((f.dmx && f.dmx.mode === 'special') ? 'special' : 'dmax') : null;
+  const dbRows = d.forms.map(f => ({
+    dex: f.dex, id: f.id, keep: f.verdict.tier < 3, shadow: /_shadow$/.test(f.id), mx: mxOf(f),
+  }));
+  const shForms = d.forms.filter(f => /_shadow$/.test(f.id) && f.verdict.tier < 3);
+  // 取真資料兩個不同編號的暗影行（非連續、不落入壓縮）→ 必須輸出「a,b&shadow」單一尾端限定詞
+  const seenDex = new Set();
+  const picks = [];
+  for (const f of shForms) {
+    if (seenDex.has(f.dex)) continue;
+    for (const p of picks) { if (Math.abs(p.dex - f.dex) < 2) continue; }
+    if (picks.length && Math.abs(picks[0].dex - f.dex) < 2) continue; // 避開相鄰編號（會被壓成 a,b／a-b）
+    seenDex.add(f.dex); picks.push(f);
+    if (picks.length === 2) break;
+  }
+  t('有可用的兩個非相鄰暗影（測試對象存在）', picks.length === 2 && Math.abs(picks[0].dex - picks[1].dex) >= 2,
+    picks.map(f => f.dex).join(' '));
+  const planA = CORE.searchPlan(picks.map(f => ({ dex: f.dex, id: f.id, shadow: true, mx: null })), dbRows);
+  t('真資料兩非連續暗影 → 尾端單次 &shadow', planA.text.endsWith('&shadow') && (planA.text.match(/&/g) || []).length === 1,
+    planA.text);
+  const segs = planA.text.replace(/&shadow$/, '').split(',');
+  t('必須為兩個單獨編號（中段無限定詞）', segs.length === 2 && segs.join(',') === picks.map(f => String(f.dex)).join(','), segs.join(' | '));
+}
+
+/* ---------- R22：tooLong 接進 UI——真資料 tier2 全量字串 > 900、分批可重組 ---------- */
+console.log('\n[R22] 真資料 tier2 名單超長 → tooLong + 分批');
+{
+  const mxOf = f => f.dmg ? 'gmax' : f.dm ? ((f.dmx && f.dmx.mode === 'special') ? 'special' : 'dmax') : null;
+  const dbRows = d.forms.map(f => ({
+    dex: f.dex, id: f.id, keep: f.verdict.tier < 3, shadow: /_shadow$/.test(f.id), mx: mxOf(f),
+  }));
+  const rows2 = d.forms.filter(f => f.verdict.tier === 2).map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), mx: mxOf(f) }));
+  const plan2 = CORE.searchPlan(rows2, dbRows);
+  t('tier2（看情況）全量字串 ' + plan2.text.length + ' 字元，tooLong 開啟', plan2.tooLong === true && plan2.text.length > 900,
+    'len=' + plan2.text.length);
+  const batches = CORE.splitSearchText(plan2.text, 900);
+  t('分批每批 ≤ 900', batches.every(b => b.length <= 900), batches.map(b => b.length).join('、'));
+  t('分批可重組成原字串', batches.join(',') === plan2.text);
+  t('真的被切成多批（≥2，不再隱藏而照樣複製）', batches.length >= 2, batches.length);
+}
+
+/* ---------- UI 接線（R22/R23/R24/R25/R26/R27/R28：app.js／index.html 來源核對） ---------- */
+console.log('\n[UI] 複製流程與文案接線（來源碼核對——UI 行為另以瀏覽器 smoke 驗證）');
+{
+  const appSrc = fs.readFileSync('site/js/app.js', 'utf8');
+  const html = fs.readFileSync('site/index.html', 'utf8');
+  // R24：複製一律先經確認視窗（先警告後複製）；individual protection 文案必在
+  t('R24 copyList 只接 showCopyWarn（先警告後複製）', /addEventListener\('click', \(\) => showCopyWarn\(buildSearchPlan\(\)\)\)/.test(appSrc));
+  t('R24 個體保護文案存在（shiny／lucky／活動造型／特殊背景不可用搜尋區分）', ['色違（shiny）', '亮晶晶（lucky）', '活動造型', '特殊背景'].every(w => appSrc.includes(w)));
+  t('R24 進度數字與複製前確認：copyWarnCopy 確認鍵存在', appSrc.includes('copyWarnCopy') && html.includes('copyWarnCopy'));
+  // R22：tooLong 分批
+  t('R22 使用 plan.tooLong＋splitSearchText 分批', /plan\.tooLong/.test(appSrc) && /splitSearchText/.test(appSrc) && /batchBtn/.test(appSrc));
+  t('R22 保守估值標示（900 非官方上限）', /900 是社群回報的保守估值/.test(appSrc));
+  // 舊「複製後才警告」的視窗必須消失（否則流程會倒回）
+  t('R24 舊 showMixWarn（複製後警告）呼叫已移除', !/showMixWarn\(/.test(appSrc));
+  t('R24 舊 mixWarn modal 已移除', !/mixWarn/.test(fs.readFileSync('site/index.html', 'utf8')));
+  // R23：special Max 詳情頁不再自相矛盾
+  t('R23 special 同池＝Max Battle 可參戰者（不再寫「可極巨化型態內」）', appSrc.includes("f.dmx.mode === 'special' ? 'Max Battle 可參戰者' : '可極巨化型態'"));
+  t('R23 special 威力說明分尺度（D-Max 級 350／G-Max 級 450）', appSrc.includes('G-Max 尺度)') ? true : appSrc.includes('G-Max 尺度') && appSrc.includes('D-Max 尺度') && appSrc.includes('Dynamax Cannon'));
+  t('R23 舊「只有極巨化／超極巨化個體能出戰」已改為分池開頭', appSrc.includes('Max Battle 的參戰者除了極巨化／超極巨化個體'));
+  // R25：defaultIVs 不再叫 Rank 1
+  t('R25 UI 不再把 defaultIVs 稱為 Rank 1', appSrc.includes('PvPoke 預設 IV') && !appSrc.includes('rank1 參考 IV'));
+  // R26：盃賽提示先過濾同 CP
+  t('R26 cupForCap 過濾同 CP（不再無條件取 cupR[0]）', appSrc.includes('cupForCap') && !appSrc.includes('(current.cupR || [])[0]'));
+  // R27：Mega 代表挑最高百分位
+  t('R27 bestMega 降冪挑最高 pct', /sort\(\(a, b\) => b\.pve\.pct - a\.pve\.pct\)/.test(appSrc) && !/a\.pve\.pct - b\.pve\.pct/.test(appSrc));
+  // R28：資料新鮮度揭露
+  t('R28 揭露建置日 ≠ 來源更新日', appSrc.includes('≠來源更新日') || appSrc.includes('資料建置 ≠ 來源更新日'));
+  // R22/R24 保留既有 guard
+  t('既有空名單 guard 保留（copyBtn.hidden）', /copyBtn\.hidden = !\(anyFilter && list\.length\)/.test(appSrc));
+  // R23：diff_tiers 模板殘留
+  const dtSrc = fs.readFileSync('tools/diff_tiers.js', 'utf8');
+  t('R23 diff_tiers 模板不再殘留 R06/R07 舊結論', !/R06 蒼響／藏瑪然特＝真 Dynamax/.test(dtSrc) && /R16 蒼響/.test(dtSrc));
+}
+
+/* ---------- R25：IV 計算機錨點（真資料種族值 × 真枚舉） ---------- */
+console.log('\n[R25] IV 名次錨點：PvPoke 預設 IV ≠ Rank 1（外部對照 PvPokeTW 截圖）');
+{
+  const stats = id => { const f = form(id); return { a: f.a, d: f.d, h: f.h, id: f.id }; };
+  const az = stats('azumarill');
+  const r1 = CORE.ivRank(az, [0, 15, 15], 1500, false);
+  t('Azumarill 超級聯盟 0/15/15 → Rank #1／Lv45.5／CP1499', r1.rank === 1 && r1.level === 45.5 && r1.cp === 1499, JSON.stringify(r1));
+  const r215 = CORE.ivRank(az, [4, 15, 13], 1500, false);
+  t('Azumarill 超級聯盟 4/15/13（PvPoke defaultIVs）→ #215／Lv43／CP1499', r215.rank === 215 && r215.level === 43 && r215.cp === 1499, JSON.stringify(r215));
+  t('PvPoke 預設 IV 不是 Rank 1（#215 ≠ #1，UI 標示不可混稱）', r215.rank !== 1 && r1.rank === 1);
+  const r500 = CORE.ivRank(az, [0, 15, 15], 500, false);
+  t('Azumarill CP500 0/15/15 → #1（Lv' + r500.level + '／CP' + r500.cp + '）', r500.rank === 1 && r500.cp <= 500, JSON.stringify(r500));
+  const r2500 = CORE.ivRank(az, [15, 15, 15], 2500, false);
+  t('Azumarill CP2500 15/15/15 → #1（上限寬鬆側，攻滿合理）', r2500.rank === 1 && r2500.cp <= 2500, JSON.stringify(r2500));
+  const rm = CORE.ivRank(az, [15, 15, 15], 10000, false);
+  t('大師聯盟（CP 無上限）15/15/15 → #1', rm.rank === 1 && rm.level === 50, JSON.stringify(rm));
+  const rmLow = CORE.ivRank(az, [0, 15, 15], 10000, false);
+  t('大師聯盟 0/15/15 ≠ #1（Rank 1 不代表對局必勝；低攻僅在 CP 上限賽制有利）', rmLow.rank > 1 && rmLow.rank <= 4096, JSON.stringify(rmLow));
+  const ch = stats('charizard');
+  t('Charizard 超級聯盟 5/14/15 → #13', CORE.ivRank(ch, [5, 14, 15], 1500, false).rank === 13, '');
+  t('Venusaur 超級聯盟 4/13/14 → #18', CORE.ivRank(stats('venusaur'), [4, 13, 14], 1500, false).rank === 18, '');
+  t('Mewtwo 超級聯盟 4/14/13 → #96', CORE.ivRank(stats('mewtwo'), [4, 14, 13], 1500, false).rank === 96, '');
+  const chs = stats('charizard_shadow');
+  const rsh = CORE.ivRank(chs, [0, 15, 15], 1500, true);
+  t('暗影形態（×1.2 攻／×0.8333 防）名次與同 IV 一般個體不同且有效', rsh && rsh.rank >= 1 && rsh.rank <= 4096 && rsh.cp <= 1500 && rsh.rank !== r1.rank, JSON.stringify(rsh));
+  // 資料級：judge 產生的判定理由也不得再稱「rank1 參考 IV」（R25 用語一致）
+  const oldLabel = d.forms.filter(f => (f.verdict.why || []).join('；').includes('rank1 參考')).map(f => f.id);
+  t('判定理由不再以 rank1 參考稱呼 defaultIVs', oldLabel.length === 0, '違規: ' + oldLabel.slice(0, 6).join(' '));
 }
 
 /* ---------- R04 反向稽核：假暗影 tier3 注入 → audit 必須 exit≠0 ---------- */

@@ -125,10 +125,15 @@ if (splits.length) for (const r of splits.slice(0, 60))
 md.push('');
 md.push('## 修改重點摘要');
 md.push('');
+// R23：摘要只寫「已經成立的事實」。早期版本在這裡殘留 R06/R07 的臨時結論
+//（蒼響／藏瑪然特＝真 Dynamax、無極汰那＝一般 Dynamax），已被 R16/R17 推翻——
+// 第三輪核實（2026-11-07 官方公告＋Serebii）：三者皆「可參戰 Max Battle 但不能 Dynamax」
+//（dmx.mode='special'），招式威力：Behemoth Blade／Bash＝D-Max 級（350／Max+ 450）、
+// Dynamax Cannon＝G-Max 級（450／Max+ 550，龍屬）；無極汰那每帳號僅能捕獲一次。
 md.push('- PvE 能量模型重寫（H01）、暗影防禦縮減納入（M07）、DPS 指標改名與假設揭露（H02/M05/M06）');
 md.push('- 極巨攻擊屬性＝快招屬性（H03）、威力分級 350/450（H04/H05）、Max+ 揭露、R02 拆行後逐行分算（_dmax＝350，_gmax＝450）');
-md.push('- R06 蒼響／藏瑪然特＝真 Dynamax＋專屬鋼屬 Max 招（Behemoth Blade／Bash，威力級 350）');
-md.push('- R07 無極汰那＝一般 Dynamax（撤回「G-Max 級 450／tier0 必留」特案；專屬招式是蓄力招＋冒險效果）');
+md.push('- R16 蒼響(劍之王)／藏瑪然特(盾之王)／無極汰那＝特殊 Max 參戰者：可參戰 Max Battle、不能 Dynamax／超極巨化（dmx.mode=\'special\'）；專屬招式 Behemoth Blade／Bash（鋼，D-Max 級 350）、Dynamax Cannon（龍，G-Max 級 450）');
+md.push('- R17 無極汰那＝每帳號僅能捕獲一次（已捕帳號 2026-11 起活動改給 100 糖）');
 md.push('- R05 普通屬性蓄力招退出 ×1.6 弱點分榜（porygon 系／雷吉奇卡斯等不再被假屬性分榜灌級）');
 md.push('- R09 盃賽榜 45 天新鮮度：過期盃停用「限制盃人選」評級升級');
 md.push('- L04 暗影高價值保護統一（R04）：任一聯盟（含 500）前 150／PvE 前 10%／屬性分榜前 5% 不得判可傳送');

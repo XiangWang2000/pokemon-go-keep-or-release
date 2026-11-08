@@ -167,9 +167,12 @@ function render() {
   } else {
     grid.innerHTML = list.map(cardHtml).join('');
   }
-  // 計數行：標明資料更新日（新手需要知道資料新不新）；有標記就附統計，清包時一眼看清
+  // 計數行：標明資料「建置日」與各來源「撈取日」（R28：建置日 ≠ 各來源更新日，要分開標）；
+  // 有標記就附統計，清包時一眼看清
+  const fr = (DATA.meta && DATA.meta.fetched) || {};
+  const cupStale = CORE.dataOlderThanDays(DATA.cupFetched, 45);
   let cntLine = `共 ${list.length} 個型態（資料庫共 ${FORMS.length} 個）`;
-  if (DATA.meta && DATA.meta.date) cntLine += ` · 資料更新 ${DATA.meta.date} · 來源：PvPoke／PokeMiners`;
+  if (DATA.meta && DATA.meta.date) cntLine += ` · 資料建置 ${DATA.meta.date}（≠來源更新日：動態GM ${fr.go_gm || '—'}／盃賽榜 ${DATA.cupFetched || '—'}${cupStale ? '⚠已逾45天' : ''}／Max 清單 ${fr.max_list || '—'}）`;
   const mkCnt = { 保留: 0, 可送: 0, 已送: 0 };
   for (const k of Object.keys(marks)) if (mkCnt[marks[k]] !== undefined) mkCnt[marks[k]]++;
   const mkTotal = mkCnt.保留 + mkCnt.可送 + mkCnt.已送;
@@ -251,7 +254,9 @@ function openDetail(f) {
     const megas = baseRow && baseRow.megas || [];
     let megaLine = '';
     if (megas.length) {
-      const bestMega = megas.filter(m => m.pve && m.pve.pct != null).sort((a, b) => a.pve.pct - b.pve.pct)[0];
+      // R27：pct 是「愈高愈強」的百分位——修正前 (a-b) 反而挑出最弱 Mega 當代表
+      // （真資料：charizard_mega_x 95.4 vs mega_y 97.8，舊碼選了 X）
+      const bestMega = megas.filter(m => m.pve && m.pve.pct != null).sort((a, b) => b.pve.pct - a.pve.pct)[0];
       megaLine = '<p style="margin:0"><b>結論：想玩這隻的「超級進化」就必須先淨化</b><br>' +
         '· 暗影個體<b>不能</b>超級進化——這個物種的超級進化型態' +
         (bestMega ? `估算為攻打道館／團體戰前 ${(100 - bestMega.pve.pct).toFixed(1)}% 的輸出戰力` : `有 ${megas.map(m => m.zlabel).join('／')}`) +
@@ -290,12 +295,26 @@ function openDetail(f) {
   let dmxHtml = '';
   if (f.dmx && (f.dm || f.dmg)) {
     const atkPct = Math.max(0.1, 100 - f.dmx.pct).toFixed(1).replace(/\.0$/, '');
+    // R23：特殊 Max 參戰者「可參戰 Max Battle 但不能 Dynamax」——修掉與這條新說明衝突的舊文案：
+    // 比較母體 ≠「可極巨化型態內」（那是 dm/dmg 家族），special 的同池是「全部 Max Battle 可參戰者」；
+    // 威力說明也按物種分尺度（蒼響／藏瑪然特＝D-Max 級 350／Max+ 450；無極汰那＝G-Max 級 450／Max+ 550，
+    // 均為 2026-11 官方：Max Battle 專屬招式威力表＋Dynamax Trails 公告）。
+    const poolLabel = f.dmx.mode === 'special' ? 'Max Battle 可參戰者' : '可極巨化型態';
+    const isDragon = f.dmx.tp === 'dragon';
+    const powerNote = f.dmx.mode === 'special'
+      ? (isDragon
+        ? '· 無極汰那的 Max 專屬招 Dynamax Cannon（龍）威力＝350/400/450（Max+ 550，G-Max 尺度）——本估算取 450；<br>'
+        : '· 蒼響(劍之王)／藏瑪然特(盾之王)的 Max 專屬招 Behemoth Blade／Bash（鋼）威力＝250/300/350（Max+ 450，D-Max 尺度）——本估算取 350；<br>')
+      : '· 極巨攻擊威力隨技能等級：一般 L1/2/3＝250/300/350、超極巨招式＝350/400/450（Max+ 再 +100）——本估算取 L3（350/450）為尺度；<br>';
+    const poolIntro = f.dmx.mode === 'special'
+      ? 'Max Battle 的參戰者除了極巨化／超極巨化個體，也含「特殊 Max 參戰者」（蒼響(劍之王)／藏瑪然特(盾之王)／無極汰那——可參戰但<b>不能 Dynamax 或超極巨化</b>），輸出以 Max 專屬招式為主。'
+      : 'Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主。';
     dmxHtml = `<details class="fold"><summary>極巨戰（Max Battle）攻擊估算<span class="fdnote">攻手前 ${atkPct}%</span></summary><div class="foldbody"><table class="stats">
-      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : (f.dmx.mode === 'special' ? `（Max Battle 專屬招式 ${f.id === 'eternatus' ? 'Dynamax Cannon' : 'Behemoth Blade／Bash'}，固定不變）` : (f.dmx.mode === 'gmax' ? '（專屬 Max 招式，固定不變）' : '（＝快招屬性，換快招即換屬性）'))}</td></tr>
+      <tr><td>極巨攻擊屬性</td><td>${TYPE_ZH[f.dmx.tp] ? typeBadge(f.dmx.tp) : (f.dmx.tp || '—')}${f.dmg ? '（專屬超極巨招式，固定不變）' : (f.dmx.mode === 'special' ? `（Max 專屬招式 ${isDragon ? 'Dynamax Cannon' : 'Behemoth Blade／Bash'}，固定不變）` : (f.dmx.mode === 'gmax' ? '（專屬 Max 招式，固定不變）' : '（＝快招屬性，換快招即換屬性）'))}</td></tr>
       <tr><td>極巨攻擊循環 DPS 估算</td><td>${f.dmx.dps}</td></tr>
-      <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（可極巨化型態內）</td></tr></table>
-      <div class="ivref" style="margin-top:6px">Max Battle 只有極巨化／超極巨化個體能出戰，輸出以極巨攻擊為主。估算假設（揭露式的相對指標，不是實測模擬）：<br>
-      · 極巨攻擊威力隨技能等級：一般 L1/2/3＝250/300/350、超極巨招式＝350/400/450（Max+ 再 +100）——本估算取 L3（350/450）為尺度；<br>
+      <tr><td>攻手池百分位</td><td>排行前 <b>${atkPct}%</b>（${poolLabel}內）</td></tr></table>
+      <div class="ivref" style="margin-top:6px">${poolIntro}估算假設（揭露式的相對指標，不是實測模擬）：<br>
+      ${powerNote}
       · Max 條以快招命中累積（快招較有效率），模型假設「滿條 ≈ 25 次快招命中＋極巨招施放 2.5 秒」（GO GM 極巨招式模板 duration 一律 2500ms）；<br>
       · 這個排名同池比較「攻擊體質 × 屬性 STAB × 快招集條速度」；要撐完整場也參考有效體質。<br>
       ${f.dmg ? '· 超極巨化個體攻擊槽是專屬招式，威力天生比一般極巨攻擊高一階（同技能等級下）。目標相性由專屬屬性決定，不隨快招。' : ''}</div></div></details>`;
@@ -357,9 +376,10 @@ function openDetail(f) {
 
     ${dmxHtml ? dmxHtml : ''}
 
-    ${fold(false, '建議對戰個體值（rank 1 參考）', null, `<div class="ivref" style="margin-bottom:8px"><b>為什麼排名 1 的 IV 常是「攻低」？</b>對戰有 CP 上限：攻擊愈低，同一隻能升到的等級愈高、愈耐打——<b>3/14/12 不是差，是這隻在該聯盟裡最耐打的黃金組合</b>。<br>
+    ${fold(false, '建議對戰個體值（PvPoke 預設 IV）', null, `<div class="ivref" style="margin-bottom:8px"><b>來源：PvPoke 預設 IV——模擬用，不是「體質真正第 1 名」</b>（R25）。這是 PvPoke 排行模擬時的預設輸入；若想知道該聯盟的體質真正第 1，用下方「IV 排名計算機」輸入 0/15/15 這類組合驗證。例：超級聯盟瑪力露麗的真正第 1 是 0/15/15（Lv45.5／CP1499），PvPoke 預設 4/15/13 實為第 215 名（本站同一套 4096 組枚舉重建，兩個結果都可重現）。<br><br>
+      <b>為什麼 PvP 對戰的最好 IV 常是「攻低」？</b>對戰有 CP 上限：攻擊愈低，同一隻能升到的等級愈高、愈耐打——<b>3/14/12 不是差，是這隻在該聯盟裡最耐打的黃金組合</b>。<br>
       遊戲內看 IV：打開寶可夢 →「查看／評價」→ 三條評價條（滑桿樣式）＋上方星級，對應攻／防／血。</div><div class="ivlines">${ivRefs}</div>
-      <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名 ↓</div>`)}
+      <div class="ivref" style="margin-top:6px">格式＝攻/防/血，例如 15/15/15。輸入你的個體值就能算排名（真正的體質名次）↓</div>`)}
 
     ${fold(false, 'IV 排名計算機', null,
       `<div class="ivref" style="margin-bottom:8px">IV＝個體值（每項 0–15、天生固定；只有淨化 +2 或瓶蓋訓練可補）。遊戲內怎麼看：見上一區的說明。</div>
@@ -467,9 +487,12 @@ function runIvCalc() {
     // 物種本身在「該聯盟」的地位（IV 再好也救不了整體太弱的物種）
     const sp = current.pvp && current.pvp[cap];
     const spRank = sp ? sp.r : null;
-    const cupBest = (current.cupR || [])[0]; // cupR 在建置時已依名次升冪
-    const cupCd = cupBest ? (DATA.cups || [])[cupBest[0]] : null;
-    const cupHit = cupBest && cupBest[1] <= 50;
+    // R26：盃賽提示只認「CP 上限＝所選聯盟」＋45 天新鮮度——cupR 不限同一 CP，
+    // 舊碼無條件取第一個，會把小小盃 #26（seel）／#33（sandshrew_alolan）當成超級聯盟的保留依據；
+    // 過期盃（R09 同門檻 45 天）不參與 grade，僅列舉時標示「已逾時效、僅供參考」
+    const cupStale = CORE.dataOlderThanDays(DATA.cupFetched, 45);
+    const cupCd = CORE.cupForCap(current.cupR, DATA.cups, cap);
+    const cupHit = cupCd && !cupStale && cupCd.rank <= 50;
     let grade, color;
     if (spRank != null && spRank > 350) {
       grade = cupHit ? '聯盟榜後段，但受限盃前 50 人選' : '物種排行偏後，IV 衝滿也有限';
@@ -489,14 +512,14 @@ function runIvCalc() {
       const hundo = pv.every(v => v === 15);
       purifyLine = `<br>淨化後 IV：<b>${pv.join('/')}</b>${hundo ? '（<b>淨百！</b>淨化即變 15/15/15）' : ''}`;
     }
-    const cupLine = cupCd ? `<br>盃賽情報：在「${cupCd.zh}（CP${cupCd.cp}）」排行第 <b>${cupBest[1]}</b> 名／榜單共 ${cupCd.total} 型態` : '';
+    const cupLine = cupCd ? `<br>盃賽情報：在「${cupCd.zh}（CP${cupCd.cp}）」排行第 <b>${cupCd.rank}</b> 名／榜單共 ${cupCd.total} 型態${cupStale ? `——榜單抓取日 ${CORE.esc(DATA.cupFetched)} 已逾 45 天，僅供參考` : ''}` : '';
     const spLine = spRank != null
       ? `物種在${cap === 500 ? '500 格式總榜' : capName(cap)}排行第 <b>${spRank}</b> 名（IV 排名是 #${r.rank}/${r.total}）`
       : `物種未進入${cap === 500 ? '500 格式總榜' : capName(cap)}排行榜＋IV 排名是 #${r.rank}/${r.total}`;
     $('#ivResult').innerHTML = `<span class="grade" style="background:${color};color:#141420">${grade}</span><br>
       ${spLine}${cupLine}<br>
       最佳等級 Lv${r.level}、CP ${r.cp}
-      ${ref ? `<br>rank1 參考 IV：${ref.slice(1).join('/')}（Lv${ref[0]}）` : ''}
+      ${ref ? `<br>PvPoke 預設 IV（模擬用，非必然 Rank 1）：${ref.slice(1).join('/')}（Lv${ref[0]}）` : ''}
       <br><span style="color:var(--muted);font-size:11px">PvP 體質愈接近「攻低、防高、血高」名次愈好；但物種本身的排名才是天花板</span>${purifyLine}`;
 }
 
@@ -546,13 +569,17 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
-// 複製目前篩出的型態 → 遊戲收藏搜尋字串（core.js searchPlan 同一實作）：
-// 純數字＝圖鑑編號、連續編號壓成 a-b、逗號＝OR；全部同類（暗影／極巨化）時補形態限定詞
-// &shadow／&dynamax；同編號混有不同形態時強制跳出警告（遊戲搜尋會一次選中同編號全部形態，
-// H07：不得直接全選傳送）
-$('#copyList').addEventListener('click', () => {
-  // R03：搜尋字串的形態風險檢查要對照「整個資料庫」，不能只看目前篩出的名單——
-  // 同編號名單外的保留個體（暗影／極巨化／一般形態）也會被編號搜尋一起選中
+// R21/R22/R24：複製「目前篩出型態」→ 遊戲收藏搜尋字串，流程＝**先警告、確認後才複製**：
+// - R21：限定詞只加在 OR 群組尾端一次（core.js searchPlan）——遊戲搜尋的逗號（OR）比
+//   &（AND）優先，「1&shadow,25&shadow」不能當 (1 AND shadow) OR (25 AND shadow)
+//   解讀會漏掉型態；這裡輸出「1,25&shadow」
+// - R24：點「複製」不再先寫剪貼簿——一律先開確認視窗：搜尋字串只是候選篩選，同編號內的
+//   色違（shiny）、4★ 高個體、亮晶晶（lucky）、活動造型、特殊背景、活動限定招式等收藏特徵
+//   無法用編號搜尋區分；混合形態／Max 混合警告也在複製「之前」呈現
+// - R22：字串超過 900 字（保守估值，官方未公開確切上限）不提供整串複製，分批逐批複製
+// R03：搜尋字串的形態風險檢查要對照「整個資料庫」，不能只看目前篩出的名單——
+// 同編號名單外的保留個體（暗影／極巨化／一般形態）也會被編號搜尋一起選中
+function buildSearchPlan() {
   // R18：Max 參戰能力分類 mx（'dmax'|'gmax'|'special'）——dynamax 只查 D-Max、
   // gigantamax 只查 G-Max、特殊參戰者兩個關鍵字都不適用 → 由 searchPlan 決定限定詞與警告
   const mxOf = f => f.dmg ? 'gmax' : f.dm ? ((f.dmx && f.dmx.mode === 'special') ? 'special' : 'dmax') : null;
@@ -560,9 +587,11 @@ $('#copyList').addEventListener('click', () => {
     dex: f.dex, id: f.id, keep: f.verdict.tier < 3,
     shadow: /_shadow$/.test(f.id), mx: mxOf(f),
   }));
-  const plan = CORE.searchPlan(lastList.map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), mx: mxOf(f) })), dbRows);
-  const s = plan.text;
-  const copyText = navigator.clipboard && navigator.clipboard.writeText
+  return CORE.searchPlan(lastList.map(f => ({ dex: f.dex, id: f.id, shadow: /_shadow$/.test(f.id), mx: mxOf(f) })), dbRows);
+}
+
+function writeClipboard(s) {
+  return navigator.clipboard && navigator.clipboard.writeText
     ? navigator.clipboard.writeText(s)
     : new Promise((res, rej) => {
       const ta = document.createElement('textarea');
@@ -571,37 +600,31 @@ $('#copyList').addEventListener('click', () => {
       try { document.execCommand('copy') ? res() : rej(new Error('execCommand')); } catch (e) { rej(e); }
       ta.remove();
     });
-  copyText.then(() => {
-    const n = [...new Set(lastList.map(f => f.dex))].length;
-    let msg = `已複製 ${n} 個編號——貼進遊戲收藏的搜尋列即可一次篩出`;
-    if (plan.qualified === 'shadow') msg += '（已補 &shadow：只選中暗影個體）';
-    else if (plan.qualified === 'dynamax') msg += '（已補 &dynamax：只選中一般可極巨化個體；超極巨化要用 &gigantamax）';
-    else if (plan.qualified === 'gigantamax') msg += '（已補 &gigantamax：只選中超極巨化個體）';
-    if (plan.warning) msg += '\n⚠ ' + plan.warning;
-    toast(msg);
-    // H07：名單內同一個編號混有不同形態 → 遊戲搜尋無法用編號區分暗影／極巨化／一般，
-    // 直接全選傳送會把要留的那隻一起送掉 → 必須強擋警告
-    showMixWarn(plan);
-  })
+}
+
+function doCopyText(s, okMsg) {
+  writeClipboard(s).then(() => toast(okMsg))
     .catch(() => toast('複製失敗：瀏覽器不允許存取剪貼簿'));
-});
-// 混形態警告視窗
+}
+
+$('#copyList').addEventListener('click', () => showCopyWarn(buildSearchPlan()));
+// R22/R24 複製確認視窗（替代舊「複製成功後才警告」的 showMixWarn：警告一律先於複製）
 let lastMixFocus = null;
-function showMixWarn(plan) {
-  const modal = document.getElementById('mixWarn');
+function closeCopyWarn() {
+  const modal = document.getElementById('copyWarn');
   if (!modal) return;
-  const body = document.getElementById('mixWarnBody');
+  modal.classList.add('hidden');
+  if (lastMixFocus) { lastMixFocus.focus({ preventScroll: true }); lastMixFocus = null; }
+}
+function showCopyWarn(plan) {
+  const modal = document.getElementById('copyWarn');
+  const body = document.getElementById('copyWarnBody');
+  if (!modal || !body) return;
+  const dexN = [...new Set(lastList.map(f => f.dex))].length;
+  const qlabel = plan.qualified === 'shadow' ? '（已補 &shadow：只選中暗影個體）'
+    : plan.qualified === 'dynamax' ? '（已補 &dynamax：只選中一般可極巨化個體；超極巨化要用 &gigantamax）'
+    : plan.qualified === 'gigantamax' ? '（已補 &gigantamax：只選中超極巨化個體）' : '';
   const mixed = plan.mixedDexes || [];
-  if (!mixed.length && !plan.warning) { modal.classList.add('hidden'); return; } // R18：純警告也可顯示
-  const warningHtml = plan.warning ? `<p style="margin-top:8px">⚠ ${CORE.esc(plan.warning)}</p>` : '';
-  if (!mixed.length) {
-    body.innerHTML = `<p>這份名單<b>無法用單一搜尋字串可靠表示</b>——遊戲的 <code>dynamax</code> 只查 D-Max、<code>gigantamax</code> 只查 G-Max，特殊 Max 參戰者兩者都不適用。</p>${warningHtml}<p style="margin-top:8px"><b>請逐隻挑選後再操作。</b></p>`;
-    modal.classList.remove('hidden');
-    lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
-    const closeBtn = document.getElementById('mixWarnClose');
-    if (closeBtn) closeBtn.focus({ preventScroll: true });
-    return;
-  }
   // 名單內的 zh 名稱（問題編號列出的是名單內形態）
   const byDex = {};
   lastList.forEach(f => { (byDex[f.dex] ||= []).push(f); });
@@ -612,30 +635,55 @@ function showMixWarn(plan) {
     const others = FORMS.filter(f => f.dex === d && !listed.has(f.id) && f.verdict.tier < 3);
     hiddenKeep[d] = others.map(f => f.zh).filter(Boolean); // zh 已含形態字樣（如「暗影」「極巨化」）
   }
-  const anyHidden = Object.values(hiddenKeep).some(a => a.length);
   const rows = mixed.map(d => {
     const inList = [...new Set((byDex[d] || []).map(f => f.zh))];
     const keep = (hiddenKeep[d] || []).filter(z => !inList.includes(z));
     const keepHtml = keep.length ? `<br><small>名單外的保留個體（也會被一起選中）：${keep.map(CORE.esc).join('、')}</small>` : '';
     return `<tr><td>#${d}</td><td>${inList.map(CORE.esc).join('、')}${keepHtml}</td></tr>`;
   }).join('');
-  body.innerHTML = `<p><b>這份名單裡有 ${mixed.length} 個圖鑑編號混合了不同形態</b>——遊戲的搜尋會一次選中該編號的<b>全部符合限定詞的形態</b>（暗影／極巨化／一般個體無法用編號區分），直接全選傳送<b>會把要留的也送掉</b>。</p>
+  const mixedHtml = mixed.length ? `<p style="margin-top:8px"><b>這份名單裡有 ${mixed.length} 個圖鑑編號混合了不同形態</b>——遊戲的搜尋會一次選中該編號的<b>全部符合限定詞的形態</b>（暗影／極巨化／一般個體無法用編號區分），直接全選傳送<b>會把要留的也送掉</b>。</p>
     <table class="stats" style="width:100%">${rows}</table>
-    <p style="margin-top:8px">正確做法：在遊戲收藏搜尋列<b>先加限定詞</b>（暗影加 <code>&amp;shadow</code>、一般可極巨化個體加 <code>&amp;dynamax</code>、超極巨化個體加 <code>&amp;gigantamax</code>——<code>dynamax</code> 只查 D-Max、<code>gigantamax</code> 只查 G-Max），或逐隻挑選後再傳送。<b>不要只用編號全選。</b></p>${warningHtml}`;
+    <p style="margin-top:8px">正確做法：在遊戲收藏搜尋列<b>先加限定詞</b>（暗影加 <code>&amp;shadow</code>、一般可極巨化個體加 <code>&amp;dynamax</code>、超極巨化個體加 <code>&amp;gigantamax</code>——<code>dynamax</code> 只查 D-Max、<code>gigantamax</code> 只查 G-Max），或逐隻挑選後再傳送。<b>不要只用編號全選。</b></p>` : '';
+  const warningHtml = plan.warning ? `<p style="margin-top:8px">⚠ ${CORE.esc(plan.warning)}</p>` : '';
+  // R22：超過 900 字（保守估值，官方未公開確切上限）→ 不提供整串複製，改分批逐批複製
+  let batches = null;
+  let longHtml = '';
+  if (plan.tooLong) {
+    batches = CORE.splitSearchText(plan.text, 900);
+    longHtml = `<p style="margin-top:8px"><b>字串長 ${plan.text.length} 字元，超過保守門檻 900</b>——遊戲輸入欄可能吃不下整串。已按 900 字切成 ${batches.length} 批，請<b>逐批複製、貼一次搜一次</b>（900 是社群回報的保守估值，官方未公開確切上限）。</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">${batches.map((b, i) => `<button class="batchBtn" data-i="${i}">複製第 ${i + 1} 批（${b.length} 字）</button>`).join('')}</div>`;
+  }
+  body.innerHTML = `<p><b>要複製的是收藏搜尋字串：${dexN} 個編號、${plan.text.length} 字元${qlabel}</b><br>
+    搜尋結果只是<b>候選清單</b>——同編號個體的色違（shiny）、4★ 高個體值、亮晶晶（lucky）、活動造型、特殊背景、活動限定招式等收藏特徵，搜尋結果上看不出來，<b>傳送／清包前請逐隻在遊戲內確認</b>，不要把搜尋結果當「可直接全選傳送」的憑證。</p>
+    ${mixedHtml}${warningHtml}${longHtml}`;
+  const copyBtn = document.getElementById('copyWarnCopy');
+  if (copyBtn) {
+    copyBtn.hidden = plan.tooLong; // 超長 → 沒有整串複製，只能用分批
+    if (plan.tooLong) copyBtn.onclick = null;
+    else copyBtn.onclick = () => {
+      closeCopyWarn();
+      let msg = `已複製 ${dexN} 個編號——貼進遊戲收藏的搜尋列即可一次篩出${qlabel}`;
+      if (plan.warning) msg += '\n⚠ ' + plan.warning;
+      doCopyText(plan.text, msg);
+    };
+  }
+  if (batches) body.querySelectorAll('.batchBtn').forEach(btn => {
+    const i = +btn.dataset.i;
+    btn.onclick = () => doCopyText(batches[i], `已複製第 ${i + 1}/${batches.length} 批——貼進遊戲搜尋列只篩這一批，傳送前仍請逐隻確認`);
+  });
   modal.classList.remove('hidden');
-  // R11：先存還原目標、再移動焦點（先 focus 會把 activeElement 變成 closeBtn、還原目標就丟了）
+  // R11：先存還原目標、再移動焦點（先 focus 會把 activeElement 變成按鈕、還原目標就丟了）
   lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
-  const closeBtn = document.getElementById('mixWarnClose');
+  const closeBtn = document.getElementById('copyWarnClose');
   if (closeBtn) closeBtn.focus({ preventScroll: true });
 }
 {
-  const modal = document.getElementById('mixWarn');
+  const modal = document.getElementById('copyWarn');
   if (modal) {
-    const close = () => { modal.classList.add('hidden'); if (lastMixFocus) { lastMixFocus.focus({ preventScroll: true }); lastMixFocus = null; } };
-    document.getElementById('mixWarnClose').onclick = close;
-    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    document.getElementById('copyWarnClose').onclick = closeCopyWarn;
+    modal.addEventListener('click', e => { if (e.target === modal) closeCopyWarn(); });
     // R11：Esc 在 modal 開啟時只關 modal——攔截傳播，避免同時觸發底層詳情面板的關閉
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { e.stopImmediatePropagation(); close(); } });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { e.stopImmediatePropagation(); closeCopyWarn(); } });
   }
 }
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
@@ -682,14 +730,18 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(
   el.id = 'loadingState';
   grid.appendChild(el);
 }
-fetch('data/data.json?v=22b9822333').then(r => {
+fetch('data/data.json?v=e91c81a980').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }).then(d => {
   DATA = d; FORMS = d.forms;
   assignSortKeys();
   const dd = document.getElementById('dataDate');
-  if (dd && DATA.meta && DATA.meta.date) dd.textContent = `資料更新日：${DATA.meta.date}（榜單來源 PvPoke、盃賽榜 ${DATA.cupFetched || '—'} 撈取）`;
+  if (dd && DATA.meta && DATA.meta.date) {
+    const fr = DATA.meta.fetched || {};
+    const stale = CORE.dataOlderThanDays(DATA.cupFetched, 45);
+    dd.textContent = `資料建置日：${DATA.meta.date}（資料建置 ≠ 來源更新日——動態GM ${fr.go_gm || '—'}、盃賽榜 ${DATA.cupFetched || '—'}${stale ? '（⚠ 已逾 45 天，僅供參考）' : ''}、Max 清單 ${fr.max_list || '—'}；發版前請照 docs/DEVELOPMENT.md 核對各來源需要重抓）`;
+  }
   $('#loadingState') && $('#loadingState').remove();
   // 屬性下拉（填充完補回存檔的篩選值：還原時序在載入前，選項卻在載入後才有）
   const types = [...new Set(FORMS.flatMap(f => f.t))].sort();

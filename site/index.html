@@ -100,17 +100,18 @@
   <button id="closeDetail" aria-label="關閉詳細資訊">✕</button>
   <div id="detailBody"></div>
 </aside>
-<!-- H07：複製名單含混合形態編號時的強制警告（遊戲搜尋會一次選中同編號全部形態） -->
-<div id="mixWarn" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="mixWarnTitle" aria-describedby="mixWarnBody">
+<!-- R22/R24：複製搜尋字串的確認視窗——警告（混合形態／超長／Max 混合／個體保護）一律先於複製 -->
+<div id="copyWarn" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="copyWarnTitle" aria-describedby="copyWarnBody">
   <div class="modalbox" role="document">
-    <h2 id="mixWarnTitle">⚠ 同編號混有不同形態——不可用編號全選傳送</h2>
-    <div id="mixWarnBody"></div>
-    <button id="mixWarnClose" aria-label="關閉警告">我知道了，關閉</button>
+    <h2 id="copyWarnTitle">⚠ 複製搜尋字串前——請先了解搜尋結果的限制</h2>
+    <div id="copyWarnBody"></div>
+    <button id="copyWarnCopy" hidden>我了解了，複製搜尋字串</button>
+    <button id="copyWarnClose" aria-label="關閉警告">關閉</button>
   </div>
 </div>
 <div id="toast" role="status"></div>
 <button id="toTop" hidden aria-label="回到最上方" title="回到最上方（篩選列）">▲</button>
-<script src="js/core.js?v=2e8b26bbb6"></script>
-<script src="js/app.js?v=5a82d3777e"></script>
+<script src="js/core.js?v=57742d8184"></script>
+<script src="js/app.js?v=52537d35a2"></script>
 </body>
 </html>

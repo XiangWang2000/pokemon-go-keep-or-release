@@ -140,8 +140,8 @@
   // R18（官方搜尋 FAQ＋GO Hub）：`dynamax` 只查 D-Max、`gigantamax` 只查 G-Max；
   // 特殊參戰者兩個關鍵字都不適用 → 名單一旦含 special 或 D/G 混合，就無法用單一搜尋字串
   // 可靠表示——不補限定詞（不造假承諾），並在 warning 說明需逐隻複核。
-  // - 形態限定詞：全部暗影行 → &shadow（只選中暗影個體）；全部 'dmax' → &dynamax；
-  //   全部 'gmax' → &gigantamax；其餘組合 → 不補
+  // - 形態限定詞：全部暗影行 → 尾端一次 &shadow（只選中暗影個體）；全部 'dmax' → &dynamax；
+  //   全部 'gmax' → &gigantamax；其餘組合 → 不補（R21：限定詞只加一次在 OR 群組尾端）
   // - mixedDexes 兩類來源：
   //   (a) 名單內同編號混有不同形態類（暗影／Max／一般，無法用編號區分）
   //   (b) R03：名單外、但會被這個搜尋選中的同編號「保留個體」（限定詞會被一起套上，
@@ -167,19 +167,25 @@
     }
     dexes.sort(function (a, b) { return a - b; });
     var qual = allShadow ? 'shadow' : (allDmax ? 'dynamax' : (allGmax ? 'gigantamax' : null));
+    // R21（ PokéGO 搜尋運算）：逗號（OR）比 &（AND）優先、且不支援括號——
+    // 「1&shadow,25&shadow」不能當成 (1 AND shadow) OR (25 AND shadow) 解讀，會漏掉預期型態。
+    // 修法：所有編號／區間合成一個 OR 群組，限定詞只在尾端加一次 →「1,25&shadow」。
+    // 來源：官方搜尋 FAQ（Scopely helpshift）＋ GO Hub Search Strings ＋ Pokémon GO Wiki。
     var parts = [];
     for (var j = 0; j < dexes.length;) {
       var k = j;
       while (k + 1 < dexes.length && dexes[k + 1] === dexes[k] + 1) k++;
       var seg = dexes[j] === dexes[k] ? String(dexes[j])
         : (dexes[j] + 1 === dexes[k] ? dexes[j] + ',' + dexes[k] : dexes[j] + '-' + dexes[k]);
-      if (qual === 'shadow') seg += '&shadow';
-      else if (qual === 'dynamax') seg += '&dynamax';
-      else if (qual === 'gigantamax') seg += '&gigantamax';
       parts.push(seg);
       j = k + 1;
     }
     var text = parts.join(',');
+    if (parts.length) {
+      if (qual === 'shadow') text += '&shadow';
+      else if (qual === 'dynamax') text += '&dynamax';
+      else if (qual === 'gigantamax') text += '&gigantamax';
+    }
     // R18：無法用單一限定詞可靠表示的 Max 混合 → 明示，要求逐隻複核
     var warning = null;
     if (maxKinds.dmax && maxKinds.gmax) {
@@ -221,6 +227,43 @@
     };
   }
 
+  /* ---------- R22：超長搜尋字串分批切分 ---------- */
+  // top-level 逗號（不破壞「a-b 區間」與「a,b」兩數不壓縮語意）切成每塊 ≤ max 字元。
+  // 900 是保守估值（GO Hub／社群回報的眼界），官方未公開確切上限——UI 會照實標示。
+  function splitSearchText(text, max) {
+    var lim = max || 900;
+    if (text.length <= lim) return text ? [text] : [];
+    var out = [], cur = '';
+    var segs = text.split(',');
+    for (var i = 0; i < segs.length; i++) {
+      var token = (cur ? ',' : '') + segs[i];
+      if (cur.length && cur.length + token.length > lim) { out.push(cur); cur = segs[i]; }
+      else cur += token;
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  /* ---------- R26：IV 計算機的盃賽提示 ---------- */
+  // cupR＝[[cupIndex, rank], …]（建置時依名次升冪，但**不限同一 CP 上限**）。
+  // 只挑「CP 上限＝所選聯盟 cap」的第一個（最小名次），盃賽不對上回 null——
+  // R26 修正前無條件取 cupR[0]，會把小小盃 #26 當成超級聯盟的保留依據（真資料 seel 案例）。
+  function cupForCap(cupR, cups, cap) {
+    if (!cupR) return null;
+    for (var i = 0; i < cupR.length; i++) {
+      var cd = (cups || [])[cupR[i][0]];
+      if (cd && cd.cp === +cap) return { zh: cd.zh, cp: cd.cp, rank: cupR[i][1], total: cd.total };
+    }
+    return null;
+  }
+  // 時效（R09 同一門檻）：dateStr 距今 > days 天 → 過期（dateStr 缺值=未知，不判過期）
+  function dataOlderThanDays(dateStr, days) {
+    if (!dateStr) return false;
+    var t = new Date(dateStr).getTime();
+    if (isNaN(t)) return false;
+    return (Date.now() - t) / 86400000 > (days || 45);
+  }
+
   /* ---------- 文字跳脫（資料值一律跳脫後才進 innerHTML） ---------- */
   function esc(s) {
     return String(s == null ? '' : s)
@@ -231,6 +274,7 @@
   return {
     CPM_TABLE: CPM_TABLE, cpmOf: cpmOf, cpAt: cpAt, evalIv: evalIv, ivRank: ivRank,
     pveCycle: pveCycle, maxRate: maxRate, searchPlan: searchPlan, esc: esc,
+    splitSearchText: splitSearchText, cupForCap: cupForCap, dataOlderThanDays: dataOlderThanDays,
     MAX_ATK_DUR_SEC: MAX_ATK_DUR_SEC, HITS_PER_METER: HITS_PER_METER,
   };
 });
