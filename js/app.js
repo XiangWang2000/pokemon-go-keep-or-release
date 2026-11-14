@@ -166,6 +166,8 @@ function render() {
       可以<b>清空搜尋框</b>、把評級／屬性／類別／世代選回「全部」，或換個關鍵字再試一次。</div>`;
   } else {
     grid.innerHTML = list.map(cardHtml).join('');
+  // 首屏可見的前幾張是 LCP 候選：拉高取得優先（其餘維持 loading=lazy 離屏省流量）
+  grid.querySelectorAll('img').forEach((img, i) => { if (i < 8) img.fetchPriority = 'high'; });
   }
   // 計數行：標明資料「建置日」與各來源「撈取日」（R28：建置日 ≠ 各來源更新日，要分開標）；
   // 有標記就附統計，清包時一眼看清
@@ -608,13 +610,10 @@ function doCopyText(s, okMsg) {
 }
 
 $('#copyList').addEventListener('click', () => showCopyWarn(buildSearchPlan()));
-// R22/R24 複製確認視窗（替代舊「複製成功後才警告」的 showMixWarn：警告一律先於複製）
-let lastMixFocus = null;
+// R22/R24 複製確認視窗（native <dialog>：showModal() 自帶 Esc／top layer／inert／焦點還原，guide: dialog）
 function closeCopyWarn() {
   const modal = document.getElementById('copyWarn');
-  if (!modal) return;
-  modal.classList.add('hidden');
-  if (lastMixFocus) { lastMixFocus.focus({ preventScroll: true }); lastMixFocus = null; }
+  if (modal && modal.open) modal.close();
 }
 function showCopyWarn(plan) {
   const modal = document.getElementById('copyWarn');
@@ -671,19 +670,25 @@ function showCopyWarn(plan) {
     const i = +btn.dataset.i;
     btn.onclick = () => doCopyText(batches[i], `已複製第 ${i + 1}/${batches.length} 批——貼進遊戲搜尋列只篩這一批，傳送前仍請逐隻確認`);
   });
-  modal.classList.remove('hidden');
-  // R11：先存還原目標、再移動焦點（先 focus 會把 activeElement 變成按鈕、還原目標就丟了）
-  lastMixFocus = (document.activeElement && !modal.contains(document.activeElement)) ? document.activeElement : lastMixFocus;
-  const closeBtn = document.getElementById('copyWarnClose');
-  if (closeBtn) closeBtn.focus({ preventScroll: true });
+  modal.showModal();
+  // 初始焦點：主要動作（複製）由 autofocus 處理；超長時複製鍵 hidden → 焦點落到「關閉」（安全動作）
+  if (copyBtn && copyBtn.hidden) {
+    const closeBtn = document.getElementById('copyWarnClose');
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
+  }
 }
 {
   const modal = document.getElementById('copyWarn');
   if (modal) {
     document.getElementById('copyWarnClose').onclick = closeCopyWarn;
-    modal.addEventListener('click', e => { if (e.target === modal) closeCopyWarn(); });
-    // R11：Esc 在 modal 開啟時只關 modal——攔截傳播，避免同時觸發底層詳情面板的關閉
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { e.stopImmediatePropagation(); closeCopyWarn(); } });
+    // closedby="any" 的漸進增強：Safari 未支援 closedby → 以幾何判斷點擊是否落在 dialog 外
+    // （按與放都在外側才關：拖選文字結束在 backdrop 不會誤關）。Esc／返回手勢 native 自帶。
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+      const outside = (e, dlg) => { const r = dlg.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+      let pressedOutside = false;
+      modal.addEventListener('pointerdown', e => { pressedOutside = outside(e, modal); });
+      modal.addEventListener('pointerup', e => { if (pressedOutside && outside(e, modal)) closeCopyWarn(); });
+    }
   }
 }
 // 圖示來源切換（GO 原圖 ↔ HOME 高清），寫入 localStorage 並重渲可見區塊
@@ -719,7 +724,7 @@ grid.addEventListener('keydown', e => {
   const f = FORMS.find(x => x.id === card.dataset.id);
   if (f) openDetail(f);
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('copyWarn').open) closeDetail(); });
 
 /* ---------- 啟動 ---------- */
 // 載入骨架：資料還沒到先給個 shimmer，不是一片空白
