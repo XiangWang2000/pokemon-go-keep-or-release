@@ -241,6 +241,7 @@ console.log('\n[UI] 複製流程與文案接線（來源碼核對——UI 行為
 {
   const appSrc = fs.readFileSync('site/js/app.js', 'utf8');
   const html = fs.readFileSync('site/index.html', 'utf8');
+  const cssSrc = fs.readFileSync('site/css/style.css', 'utf8');
   // R24：複製一律先經確認視窗（先警告後複製）；individual protection 文案必在
   t('R24 copyList 只接 showCopyWarn（先警告後複製）', /addEventListener\('click', \(\) => showCopyWarn\(buildSearchPlan\(\)\)\)/.test(appSrc));
   t('R24 個體保護文案存在（shiny／lucky／活動造型／特殊背景不可用搜尋區分）', ['色違（shiny）', '亮晶晶（lucky）', '活動造型', '特殊背景'].every(w => appSrc.includes(w)));
@@ -251,6 +252,16 @@ console.log('\n[UI] 複製流程與文案接線（來源碼核對——UI 行為
   // 舊「複製後才警告」的視窗必須消失（否則流程會倒回）
   t('R24 舊 showMixWarn（複製後警告）呼叫已移除', !/showMixWarn\(/.test(appSrc));
   t('R24 舊 mixWarn modal 已移除', !/mixWarn/.test(fs.readFileSync('site/index.html', 'utf8')));
+  // native <dialog>（guide: dialog）：showModal() 自帶焦點禁閉／top layer／Esc，勿再手寫
+  t('R24+ copyWarn 用原生 <dialog>（不再是 div.modal + aria-modal）',
+    html.includes('<dialog id="copyWarn"') && !/id="copyWarn"[^>]*role=/.test(html) && !/id="copyWarn"[^>]*aria-modal/.test(html));
+  t('R24+ 用 showModal()／close() 開關', /showModal\(\)/.test(appSrc) && /if \(modal && modal\.open\) modal\.close\(\)/.test(appSrc));
+  t('R24+ 手寫 Esc／click-outside 處理已移除（Esc 交 native、outside 交 closedby fallback）',
+    !/Escape' && !modal\.classList/.test(appSrc) && !/e\.target === modal\) closeCopyWarn/.test(appSrc));
+  t('R24+ closedby="any" ＋ Safari 幾何 fallback', html.includes('closedby="any"') && appSrc.includes("'closedBy' in HTMLDialogElement.prototype"));
+  t('R24+ 捲動包含 CSS（modal 內＋::backdrop overflow:hidden）',
+    /#copyWarn:modal \{ overscroll-behavior: contain/.test(cssSrc) && /#copyWarn::backdrop \{ overflow: hidden; overscroll-behavior: contain/.test(cssSrc));
+  t('R24+ Esc 冒泡防護：copyWarn 開啟時不關詳情頁', /Escape' && !document\.getElementById\('copyWarn'\)\.open\) closeDetail\(\)/.test(appSrc));
   // R23：special Max 詳情頁不再自相矛盾
   t('R23 special 同池＝Max Battle 可參戰者（不再寫「可極巨化型態內」）', appSrc.includes("f.dmx.mode === 'special' ? 'Max Battle 可參戰者' : '可極巨化型態'"));
   t('R23 special 威力說明分尺度（D-Max 級 350／G-Max 級 450）', appSrc.includes('G-Max 尺度)') ? true : appSrc.includes('G-Max 尺度') && appSrc.includes('D-Max 尺度') && appSrc.includes('Dynamax Cannon'));

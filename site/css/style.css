@@ -300,30 +300,28 @@ html { scroll-behavior: smooth; }
 #toTop:hover { border-color: var(--accent); }
 #toTop:active { transform: translateY(1px); }
 
-/* ---------- 混形態警告視窗（H07） ---------- */
-.modal {
-  position: fixed; inset: 0; z-index: 90;
-  display: grid; place-items: center;
-  background: rgba(10, 10, 20, .55);
-  padding: 16px;
-  margin: 0;
-}
-.modal.hidden { display: none; }
-.modalbox {
-  background: var(--panel);
+/* ---------- 複製確認視窗（H07/R24；native <dialog>，guide: dialog）---------- */
+/* 不設 display（會覆蓋關閉態）；焦點禁閉／inert／top layer 由 showModal() 提供 */
+#copyWarn {
   border: 1px solid var(--line);
   border-radius: 14px;
-  max-width: 460px; width: 100%;
+  background: var(--panel); color: var(--text);
+  max-width: 460px; width: calc(100% - 32px);
   max-height: 80vh; overflow: auto;
   padding: 18px 18px 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
 }
-.modalbox h2 { font-size: 16px; margin: 0 0 10px; }
-.modalbox button {
+/* guide: prevent-page-scroll-under-modal-dialog——modal 內與 backdrop 的捲動手勢不得鏈到底層頁面；
+   ::backdrop 預設 overflow: visible（非捲動容器），必須先設 overflow: hidden 才吃 overscroll-behavior。
+   勿用 body overflow:hidden 鎖背景（移除根捲軸 → 橫向位移）。非捲動容器上的強制屬漸進增強，不 feature-detect。 */
+#copyWarn:modal { overscroll-behavior: contain; }
+#copyWarn::backdrop { overflow: hidden; overscroll-behavior: contain; background: rgba(10, 10, 20, .55); }
+#copyWarn h2 { font-size: 16px; margin: 0 0 10px; }
+#copyWarn button {
   margin-top: 12px;
   padding: 8px 14px;
   border: 1px solid var(--line); border-radius: 8px;
   background: var(--panel2); color: var(--text);
   font-weight: 600; cursor: pointer;
 }
-.modal table.stats td:last-child { text-align: left; color: var(--text); }
+#copyWarn table.stats td:last-child { text-align: left; color: var(--text); }

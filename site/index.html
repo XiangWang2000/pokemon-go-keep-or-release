@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>寶可夢GO 去留指南</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css?v=d8b0b104fb">
+<link rel="stylesheet" href="css/style.css?v=d561cd4e5e">
 </head>
 <body>
 <header>
@@ -100,18 +100,17 @@
   <button id="closeDetail" aria-label="關閉詳細資訊">✕</button>
   <div id="detailBody"></div>
 </aside>
-<!-- R22/R24：複製搜尋字串的確認視窗——警告（混合形態／超長／Max 混合／個體保護）一律先於複製 -->
-<div id="copyWarn" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="copyWarnTitle" aria-describedby="copyWarnBody">
-  <div class="modalbox" role="document">
-    <h2 id="copyWarnTitle">⚠ 複製搜尋字串前——請先了解搜尋結果的限制</h2>
-    <div id="copyWarnBody"></div>
-    <button id="copyWarnCopy" hidden>我了解了，複製搜尋字串</button>
-    <button id="copyWarnClose" aria-label="關閉警告">關閉</button>
-  </div>
-</div>
+<!-- R22/R24：複製搜尋字串的確認視窗——警告一律先於複製。native <dialog>（guide: dialog）：
+     showModal() 提供焦點禁閉／top layer／inert 背景／Esc／返回手勢／關閉後焦點還原，勿再加 role/aria-modal -->
+<dialog id="copyWarn" closedby="any" aria-labelledby="copyWarnTitle" aria-describedby="copyWarnBody">
+  <h2 id="copyWarnTitle">⚠ 複製搜尋字串前——請先了解搜尋結果的限制</h2>
+  <div id="copyWarnBody"></div>
+  <button id="copyWarnCopy" hidden autofocus>我了解了，複製搜尋字串</button>
+  <button id="copyWarnClose" aria-label="關閉警告">關閉</button>
+</dialog>
 <div id="toast" role="status"></div>
 <button id="toTop" hidden aria-label="回到最上方" title="回到最上方（篩選列）">▲</button>
 <script src="js/core.js?v=57742d8184"></script>
-<script src="js/app.js?v=698e955485"></script>
+<script src="js/app.js?v=bd0fb13ffe"></script>
 </body>
 </html>
